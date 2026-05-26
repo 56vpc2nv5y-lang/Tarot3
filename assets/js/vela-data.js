@@ -35,6 +35,137 @@ const DECK = (() => {
   return c;
 })();
 
+const IMAGE_DECKS = {
+  cat: {
+    back: 'cat/cat_card_back.png',
+    cards: {
+      ar00: 'cat/cat_major_00_fool.png',
+      ar01: 'cat/cat_major_01_magician.png',
+      ar02: 'cat/cat_major_02_high_priestess.png',
+      ar03: 'cat/cat_major_03_empress.png',
+      ar04: 'cat/cat_major_04_emperor.png',
+      ar06: 'cat/cat_major_06_lovers.png',
+      ar07: 'cat/cat_major_07_chariot.png',
+      ar08: 'cat/cat_major_08_strength.png',
+      ar09: 'cat/cat_major_09_hermit.png',
+      ar10: 'cat/cat_major_10_wheel_of_fortune.png',
+      ar11: 'cat/cat_major_11_justice.png',
+      ar13: 'cat/cat_major_13_death.png',
+      ar14: 'cat/cat_major_14_temperance.png',
+      ar15: 'cat/cat_major_15_devil.png',
+      ar16: 'cat/cat_major_16_tower.png',
+      ar17: 'cat/cat_major_17_star.png',
+      ar18: 'cat/cat_major_18_moon.png',
+      ar19: 'cat/cat_major_19_sun.png',
+      ar20: 'cat/cat_major_20_judgement.png',
+      ar21: 'cat/cat_major_21_world.png',
+      waac: 'cat/cat_wands_01_ace.png',
+      wa02: 'cat/cat_wands_02_two.png',
+      wa03: 'cat/cat_wands_03_three.png',
+      wa04: 'cat/cat_wands_04_four.png',
+      wa05: 'cat/cat_wands_05_five.png',
+      wa06: 'cat/cat_wands_06_six.png',
+      wa07: 'cat/cat_wands_07_seven.png',
+      wa08: 'cat/cat_wands_08_eight.png',
+      wa09: 'cat/cat_wands_09_nine.png',
+      wa10: 'cat/cat_wands_10_ten.png',
+      wapa: 'cat/cat_wands_page.png',
+      wakn: 'cat/cat_wands_knight.png',
+      waqu: 'cat/cat_wands_queen.png',
+      waki: 'cat/cat_wands_king.png',
+      cuac: 'cat/cat_cups_01_ace.png',
+      cu02: 'cat/cat_cups_02_two.png',
+      cu03: 'cat/cat_cups_03_three.png',
+      cu04: 'cat/cat_cups_04_four.png',
+      cu05: 'cat/cat_cups_05_five.png',
+      cu06: 'cat/cat_cups_06_six.png',
+      cu07: 'cat/cat_cups_07_seven.png',
+      cu08: 'cat/cat_cups_08_eight.png',
+      cu09: 'cat/cat_cups_09_nine.png',
+      cu10: 'cat/cat_cups_10_ten.png',
+      cupa: 'cat/cat_cups_page.png',
+      cukn: 'cat/cat_cups_knight.png',
+      cuqu: 'cat/cat_cups_queen.png',
+      cuki: 'cat/cat_cups_king.png',
+      swac: 'cat/cat_swords_01_ace.png',
+      sw02: 'cat/cat_swords_02_two.png',
+      sw03: 'cat/cat_swords_03_three.png',
+      sw04: 'cat/cat_swords_04_four.png',
+      sw05: 'cat/cat_swords_05_five.png',
+      sw06: 'cat/cat_swords_06_six.png',
+      sw07: 'cat/cat_swords_07_seven.png',
+      sw08: 'cat/cat_swords_08_eight.png',
+      sw09: 'cat/cat_swords_09_nine.png',
+      sw10: 'cat/cat_swords_10_ten.png',
+      swpa: 'cat/cat_swords_page.png',
+      swkn: 'cat/cat_swords_knight.png',
+      swqu: 'cat/cat_swords_queen.png',
+      peac: 'cat/cat_pentacles_01_ace.png'
+    }
+  },
+  divine: {
+    back: 'chinese%20god%20and%20godness/chinese_divine_card_back.png',
+    cards: {
+      ar00: 'chinese%20god%20and%20godness/divine_major_00_fool_nezha.png',
+      ar01: 'chinese%20god%20and%20godness/divine_major_01_magician_jiang_ziya.png',
+      ar02: 'chinese%20god%20and%20godness/divine_major_02_high_priestess_zhinv.png',
+      ar03: 'chinese%20god%20and%20godness/divine_major_03_empress_xi_wangmu.png',
+      ar04: 'chinese%20god%20and%20godness/divine_major_04_emperor_yu_huang_dadi.png',
+      ar05: 'chinese%20god%20and%20godness/divine_major_05_hierophant_taishang_laojun.png',
+      ar06: 'chinese%20god%20and%20godness/divine_major_06_lovers_niulang_zhinv.png',
+      ar08: 'chinese%20god%20and%20godness/divine_major_08_strength_erlang_shen.png',
+      ar09: 'chinese%20god%20and%20godness/divine_major_09_hermit_zhongli_quan.png',
+      ar10: 'chinese%20god%20and%20godness/divine_major_10_wheel_of_fortune_taiyi_zhenren.png',
+      ar11: 'chinese%20god%20and%20godness/divine_major_11_justice_bao_zheng.png',
+      ar12: 'chinese%20god%20and%20godness/divine_major_12_hanged_one_nezha_sacrifice.png',
+      ar13: 'chinese%20god%20and%20godness/divine_major_13_death_heibai_wuchang.png',
+      ar14: 'chinese%20god%20and%20godness/divine_major_14_temperance_guanyin.png',
+      ar15: 'chinese%20god%20and%20godness/divine_major_15_devil_demon_pill.png',
+      ar16: 'chinese%20god%20and%20godness/divine_major_16_tower_gonggong.png',
+      ar17: 'chinese%20god%20and%20godness/divine_major_17_star_chang_e.png',
+      ar18: 'chinese%20god%20and%20godness/divine_major_18_moon_yue_lao.png',
+      ar19: 'chinese%20god%20and%20godness/divine_major_19_sun_hou_yi.png',
+      ar20: 'chinese%20god%20and%20godness/divine_major_20_judgement_fengshen_bang.png',
+      ar21: 'chinese%20god%20and%20godness/divine_major_21_world_pangu.png',
+      waac: 'chinese%20god%20and%20godness/divine_wands_01_ace.png',
+      wa02: 'chinese%20god%20and%20godness/divine_wands_02_two.png',
+      wa03: 'chinese%20god%20and%20godness/divine_wands_03_three.png'
+    }
+  },
+  botanic: {
+    back: 'tree/botanical_codex_card_back.png',
+    cards: {
+      ar00: 'tree/botanic_major_00_fool_dandelion.png',
+      ar01: 'tree/botanic_major_01_magician_ginseng.png',
+      ar02: 'tree/botanic_major_02_high_priestess_evening_primrose.png',
+      ar03: 'tree/botanic_major_03_empress_rose.png',
+      ar04: 'tree/botanic_major_04_emperor_oak.png',
+      ar05: 'tree/botanic_major_05_hierophant_laurel.png',
+      ar06: 'tree/botanic_major_06_lovers_honeysuckle.png',
+      ar07: 'tree/botanic_major_07_chariot_morning_glory.png',
+      ar08: 'tree/botanic_major_08_strength_valerian.png',
+      ar09: 'tree/botanic_major_09_hermit_moss.png',
+      ar10: 'tree/botanic_major_10_wheel_of_fortune_sunflower.png',
+      ar11: 'tree/botanic_major_11_justice_iris.png',
+      ar12: 'tree/botanic_major_12_hanged_one_mistletoe.png',
+      ar13: 'tree/botanic_major_13_death_poppy.png',
+      ar14: 'tree/botanic_major_14_temperance_lavender.png'
+    }
+  }
+};
+
+function getActiveDeckId() {
+  return IMAGE_DECKS[window.VELA?.cardBack] ? window.VELA.cardBack : null;
+}
+
+function getCardImage(card, deckId = getActiveDeckId()) {
+  return IMAGE_DECKS[deckId]?.cards?.[card?.id] || card?.img || '';
+}
+
+function getCardBackImage(deckId = getActiveDeckId()) {
+  return IMAGE_DECKS[deckId]?.back || '';
+}
+
 // 中文牌名映射
 const CN_NAMES = {
   ar00: '愚者', ar01: '魔术师', ar02: '女祭司', ar03: '皇后', ar04: '皇帝',
@@ -242,4 +373,8 @@ function getFuSys(t) {
   return getSys(t) + '\n\n这是针对已完成塔罗解读的追问。保持你的解读视角和语气一致，给出有针对性的回答（100-200字，不重复已说内容）。';
 }
 
-window.VELA_DATA = { DECK, CN_NAMES, SPREADS, MEANINGS, MOODS, detectIntent, getMoonPhase, getSys, buildPmt, getFuSys };
+window.VELA_DATA = {
+  DECK, CN_NAMES, SPREADS, MEANINGS, MOODS, IMAGE_DECKS,
+  getCardImage, getCardBackImage,
+  detectIntent, getMoonPhase, getSys, buildPmt, getFuSys
+};

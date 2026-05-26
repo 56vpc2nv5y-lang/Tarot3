@@ -3,7 +3,7 @@
    ============================================================ */
 (function() {
   const { $, $$, el } = window.VELA_UTIL;
-  const { DECK, CN_NAMES, SPREADS, MEANINGS } = window.VELA_DATA;
+  const { DECK, CN_NAMES, SPREADS, MEANINGS, getCardImage, getCardBackImage } = window.VELA_DATA;
 
   // shuffle helper
   function shuffle(arr) {
@@ -49,13 +49,17 @@
 
   function makeCardEl(card, opts = {}) {
     const shell = el('div', { class: 'card-shell' + (opts.reversed ? ' reversed' : '') });
+    const backImg = getCardBackImage?.();
     const back = el('div', { class: 'card-face back' },
-      el('div', { class: 'card-back' },
-        el('div', { class: 'card-back-inner', html: backSVG() })
+      el('div', {
+        class: 'card-back' + (backImg ? ' image-back' : ''),
+        style: backImg ? { backgroundImage: `url("${backImg}")` } : {}
+      },
+        backImg ? '' : el('div', { class: 'card-back-inner', html: backSVG() })
       )
     );
     const front = el('div', { class: 'card-face front' });
-    const img = el('img', { class: 'card-front-img', src: card.img, alt: card.n });
+    const img = el('img', { class: 'card-front-img', src: getCardImage(card), alt: card.n });
     img.onerror = () => {
       const fb = el('div', { class: 'card-front-fallback' },
         el('div', {}, CN_NAMES[card.id] || card.n),
@@ -241,7 +245,7 @@
     const slots = document.getElementById('slots');
     if (!slots) return;
     const s = el('div', { class: 'slot filled slot-anim' });
-    const img = el('img', { src: card.img, alt: card.n });
+    const img = el('img', { src: getCardImage(card), alt: card.n });
     img.onerror = () => {
       const fb = el('div', { class: 'card-front-fallback', style: { fontSize: '10px' } }, CN_NAMES[card.id] || card.n);
       s.innerHTML = ''; s.appendChild(fb); s.appendChild(el('div', { class: 'pos-tag' }, pos));

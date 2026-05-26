@@ -6,7 +6,11 @@
    ============================================================ */
 (function() {
   const { $, $$, el, fmtTime, storage } = window.VELA_UTIL;
-  const { DECK, CN_NAMES, SPREADS, MEANINGS, MOODS, detectIntent, getMoonPhase, getSys, buildPmt, getFuSys } = window.VELA_DATA;
+  const {
+    DECK, CN_NAMES, SPREADS, MEANINGS, MOODS,
+    getCardImage, getCardBackImage,
+    detectIntent, getMoonPhase, getSys, buildPmt, getFuSys
+  } = window.VELA_DATA;
 
   // ===== Generic backdrop helpers =====
   function openModal(modal) {
@@ -211,7 +215,7 @@
     grid.innerHTML = '';
     DECK.filter(c => suit === 'all' || c.suit === suit).forEach(card => {
       const item = el('div', { class: 'deck-grid-item' });
-      const img = el('img', { src: card.img, alt: card.n });
+      const img = el('img', { src: getCardImage(card), alt: card.n });
       img.onerror = () => {
         item.innerHTML = `<div class="card-front-fallback" style="font-size:11px;">${CN_NAMES[card.id] || card.n}</div>`;
         item.appendChild(el('div', { class: 'cn' }, CN_NAMES[card.id] || ''));
@@ -240,7 +244,7 @@
       <div style="display:flex; gap:24px; flex-wrap:wrap; align-items:flex-start;">
         <div style="flex:0 0 200px;">
           <div style="aspect-ratio:0.65; background:var(--surface-2); border-radius:var(--radius-md); overflow:hidden;">
-            <img src="${card.img}" alt="${card.n}" style="width:100%; height:100%; object-fit:cover; ${isRev ? 'transform:rotate(180deg);' : ''}" onerror="this.outerHTML='<div class=&quot;card-front-fallback&quot;>${(CN_NAMES[card.id]||card.n).replace(/'/g,'')}</div>'">
+            <img src="${getCardImage(card)}" alt="${card.n}" style="width:100%; height:100%; object-fit:cover; ${isRev ? 'transform:rotate(180deg);' : ''}" onerror="this.outerHTML='<div class=&quot;card-front-fallback&quot;>${(CN_NAMES[card.id]||card.n).replace(/'/g,'')}</div>'">
           </div>
         </div>
         <div style="flex:1; min-width:200px;">
@@ -399,7 +403,7 @@
           <div style="text-align:center;">
             <div style="font-family:var(--font-ui); font-size:10px; color:var(--text-dim); margin-bottom:4px; letter-spacing:.05em;">${p.pos}</div>
             <div style="width:80px; height:128px; background:var(--surface); border-radius:var(--radius-sm); overflow:hidden; margin:0 auto;">
-              <img src="${DECK.find(c => c.id === p.cardId)?.img}" style="width:100%;height:100%;object-fit:cover;${p.rev ? 'transform:rotate(180deg);' : ''}" onerror="this.outerHTML='<div class=&quot;card-front-fallback&quot; style=&quot;font-size:10px;&quot;>${CN_NAMES[p.cardId] || p.cardId}</div>'">
+              <img src="${getCardImage(DECK.find(c => c.id === p.cardId))}" style="width:100%;height:100%;object-fit:cover;${p.rev ? 'transform:rotate(180deg);' : ''}" onerror="this.outerHTML='<div class=&quot;card-front-fallback&quot; style=&quot;font-size:10px;&quot;>${CN_NAMES[p.cardId] || p.cardId}</div>'">
             </div>
             <div style="font-family:var(--font-head); font-size:11px; color:var(--accent); margin-top:4px;">${CN_NAMES[p.cardId] || p.cardId}${p.rev ? '(逆)' : ''}</div>
           </div>
@@ -590,7 +594,7 @@
           <div class="ai-card-thumb" data-card-id="${p.card.id}" data-rev="${p.rev}">
             <div class="ai-card-thumb-pos">${p.pos}</div>
             <div class="ai-card-thumb-img${p.rev ? ' reversed' : ''}">
-              <img src="${p.card.img}" alt="${p.card.n}" onerror="this.outerHTML='<div class=&quot;card-front-fallback&quot; style=&quot;font-size:9px;&quot;>${(CN_NAMES[p.card.id]||p.card.n).replace(/&/g,'&amp;').replace(/"/g,'&quot;')}</div>'">
+              <img src="${getCardImage(p.card)}" alt="${p.card.n}" onerror="this.outerHTML='<div class=&quot;card-front-fallback&quot; style=&quot;font-size:9px;&quot;>${(CN_NAMES[p.card.id]||p.card.n).replace(/&/g,'&amp;').replace(/"/g,'&quot;')}</div>'">
             </div>
             <div class="ai-card-thumb-name">${CN_NAMES[p.card.id] || p.card.n}${p.rev ? '·逆' : ''}</div>
           </div>
@@ -912,6 +916,8 @@
     const SKINS = [
       { id: 'classic', name: '✦ 星辰经典', desc: '默认免费', pts: 0 },
       { id: 'cat',     name: '🐱 猫咪密语', desc: '粉底·爪印', pts: 150 },
+      { id: 'divine',  name: '🏮 东方神明', desc: 'Chinese Divine 牌面', pts: 220 },
+      { id: 'botanic', name: '🌿 植物谜语', desc: 'Botanical Codex 牌面', pts: 220 },
       { id: 'zodiac',  name: '⭐ 星座天穹', desc: '宇宙蓝·星座线', pts: 200 },
       { id: 'rose',    name: '🥀 哥特玫瑰', desc: '深红·荆棘', pts: 250 },
       { id: 'ink',     name: '🎋 水墨仙境', desc: '白底·竹叶', pts: 300 },
@@ -942,7 +948,8 @@
     // Render previews
     m.querySelectorAll('.store-preview').forEach(prev => {
       const skin = prev.dataset.skin;
-      prev.innerHTML = `<div class="card-back" data-skin="${skin}" style="width:100%; height:100%; position:relative;">
+      const backImg = getCardBackImage(skin);
+      prev.innerHTML = `<div class="card-back${backImg ? ' image-back' : ''}" data-skin="${skin}" style="width:100%; height:100%; position:relative;">
         <div class="card-back-inner" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center;">
           <svg viewBox="0 0 100 100" style="width:60%; height:60%;">
             <circle cx="50" cy="50" r="40" fill="none" stroke-width="0.5"/>
@@ -954,8 +961,10 @@
       // Force skin-specific style via inline override (since body[data-cardback] only affects whole body)
       const cb = prev.querySelector('.card-back');
       cb.style.background = getSkinBg(skin);
+      if (backImg) cb.style.backgroundImage = `url("${backImg}")`;
       const svg = prev.querySelector('svg');
       svg.style.stroke = getSkinStroke(skin);
+      if (backImg) svg.style.display = 'none';
     });
     m.querySelector('[data-close]').onclick = () => m.classList.remove('visible');
     m.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => {
@@ -983,6 +992,8 @@
   function getSkinBg(skin) {
     switch (skin) {
       case 'cat': return 'radial-gradient(circle at 20% 30%, rgba(255,255,255,0.4) 6px, transparent 7px), radial-gradient(circle at 70% 60%, rgba(255,255,255,0.35) 5px, transparent 6px), linear-gradient(135deg, #f5b8c8, #e89bb0)';
+      case 'divine': return 'linear-gradient(135deg, #09142e, #142653)';
+      case 'botanic': return 'linear-gradient(135deg, #e9dfc7, #bca879)';
       case 'zodiac': return 'radial-gradient(circle at center, #1a2b5e, #050816)';
       case 'rose': return 'radial-gradient(circle at 50% 50%, rgba(160,30,40,0.4), transparent 60%), linear-gradient(135deg, #2a0408, #500818, #1a0204)';
       case 'ink': return '#faf8f3';
@@ -993,6 +1004,8 @@
   function getSkinStroke(skin) {
     switch (skin) {
       case 'cat': return 'rgba(255,255,255,0.7)';
+      case 'divine': return '#d8b55d';
+      case 'botanic': return '#6d5b35';
       case 'zodiac': return 'rgba(180,200,255,0.6)';
       case 'rose': return '#d83a52';
       case 'ink': return '#2a2a2a';
