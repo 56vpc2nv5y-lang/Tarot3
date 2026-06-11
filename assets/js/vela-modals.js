@@ -7,9 +7,8 @@
 (function() {
   const { $, $$, el, fmtTime, storage } = window.VELA_UTIL;
   const {
-    DECK, CN_NAMES, SPREADS, MEANINGS, MOODS,
-    getCardImage, getCardBackImage,
-    detectIntent, getMoonPhase, getSys, buildPmt, getFuSys
+    DECK, CN_NAMES, SPREADS, MEANINGS, MOODS, FACE_SKINS, BACK_SKINS,
+    getCardImage, hasCustomCardImage, detectIntent, getMoonPhase, getSys, buildPmt, getFuSys
   } = window.VELA_DATA;
 
   // ===== Generic backdrop helpers =====
@@ -17,7 +16,10 @@
     modal.classList.add('visible');
   }
   function closeAllModals() {
-    $$('.modal-backdrop, .panel, .ai-panel').forEach(m => m.classList.remove('visible'));
+    $$('.modal-backdrop, .panel, .ai-panel').forEach(m => {
+      if (m.id === 'auth-modal' && window.VELA_CLOUD?.enabled && !window.VELA_CLOUD?.isSignedIn?.()) return;
+      m.classList.remove('visible');
+    });
   }
 
   // ===== Settings Panel =====
@@ -32,7 +34,11 @@
         <div style="font-family:var(--font-head); font-size:28px; color:var(--accent); letter-spacing:.08em;">
           ✦ <span id="settings-points">${window.VELA.points.toLocaleString()}</span>
         </div>
-        <button class="topbar-btn" id="open-store" style="margin-top:8px;">皮肤商店</button>
+        <div style="font-family:var(--font-ui);font-size:11px;color:var(--text-dim);line-height:1.8;margin-top:8px;">
+          牌面：${FACE_SKINS[window.VELA.cardFace]?.name || FACE_SKINS.classic.name}<br>
+          牌背：${BACK_SKINS[window.VELA.cardBack]?.name || BACK_SKINS.classic.name}
+        </div>
+        <button class="topbar-btn" id="open-store" style="margin-top:8px;">牌面与牌背商店</button>
       </div>
 
       <div class="panel-section">
@@ -85,6 +91,10 @@
       <div class="panel-section">
         <h3>偏好</h3>
         <div class="checkbox-row">
+          <span>手势控制</span>
+          <label class="toggle"><input type="checkbox" id="pref-gestures" ${window.VELA.prefs.gestureControl ? 'checked' : ''}><span class="toggle-track"></span></label>
+        </div>
+        <div class="checkbox-row">
           <span>摄像头预览</span>
           <label class="toggle"><input type="checkbox" id="pref-camera" ${window.VELA.prefs.cameraPreview ? 'checked' : ''}><span class="toggle-track"></span></label>
         </div>
@@ -124,10 +134,20 @@
     `;
 
     panel.querySelector('#settings-close').onclick = () => panel.classList.remove('visible');
-    panel.querySelectorAll('.theme-swatch').forEach(sw => sw.onclick = () => {
+    panel.querySelectorAll('.theme-swatch').forEach(sw => sw.onclick = async () => {
       const t = sw.dataset.t;
       if (!window.VELA.unlocked.themes.includes(t)) {
         const need = { C: 100, D: 200 }[t] || 0;
+        if (window.VELA_CLOUD?.isSignedIn?.()) {
+          try {
+            await window.VELA_CLOUD.purchaseSkin('themes', t);
+            window.VELA_THEMES.applyTheme(t);
+            buildSettings();
+          } catch (e) {
+            window.VELA_GESTURES.showTopToast(e.message || '主题解锁失败');
+          }
+          return;
+        }
         if (window.VELA.points >= need) {
           window.VELA.unlocked.themes.push(t);
           window.VELA_POINTS.addPoints(-need, `解锁主题`);  // negative skipped; use direct
@@ -163,12 +183,19 @@
       window.VELA.save();
       window.VELA_GESTURES.setCameraPreview(e.target.checked);
     };
+    panel.querySelector('#pref-gestures').onchange = async (e) => {
+      window.VELA.prefs.gestureControl = e.target.checked;
+      window.VELA.save();
+      await window.VELA_GESTURES.setGestureEnabled(e.target.checked);
+      if (e.target.checked) window.VELA_GESTURES.showOnboarding(true);
+    };
     panel.querySelector('#pref-haptics').onchange = (e) => {
       window.VELA.prefs.haptics = e.target.checked;
       window.VELA.save();
     };
     panel.querySelector('#pref-simple').onchange = (e) => {
       window.VELA.prefs.simpleAnim = e.target.checked;
+      document.body.classList.toggle('simple-anim', e.target.checked);
       window.VELA.save();
     };
     panel.querySelector('#open-deck').onclick = () => { panel.classList.remove('visible'); openDeckLibrary(); };
@@ -227,6 +254,7 @@
         if (!window.VELA.viewedCards.includes(card.id)) {
           window.VELA.viewedCards.push(card.id);
           window.VELA.save();
+          window.VELA_CLOUD?.awardPoints?.('view_card', card.id).catch(() => {});
           window.VELA_POINTS.checkProgressAchievements();
         }
         openCardDetail(card, false);
@@ -243,13 +271,13 @@
       <button class="modal-close" data-close>×</button>
       <div style="display:flex; gap:24px; flex-wrap:wrap; align-items:flex-start;">
         <div style="flex:0 0 200px;">
-          <div style="aspect-ratio:0.65; background:var(--surface-2); border-radius:var(--radius-md); overflow:hidden;">
-            <img src="${getCardImage(card)}" alt="${card.n}" style="width:100%; height:100%; object-fit:cover; ${isRev ? 'transform:rotate(180deg);' : ''}" onerror="this.outerHTML='<div class=&quot;card-front-fallback&quot;>${(CN_NAMES[card.id]||card.n).replace(/'/g,'')}</div>'">
+          <div style="aspect-ratio:0.57; background:var(--surface-2); border-radius:var(--radius-md); overflow:hidden;">
+            <img src="${getCardImage(card)}" alt="${card.n}" style="width:100%; height:100%; object-fit:contain; ${isRev ? 'transform:rotate(180deg);' : ''}" onerror="this.outerHTML='<div class=&quot;card-front-fallback&quot;>${(CN_NAMES[card.id]||card.n).replace(/'/g,'')}</div>'">
           </div>
         </div>
         <div style="flex:1; min-width:200px;">
           <h2>${CN_NAMES[card.id] || card.n}</h2>
-          <div class="modal-sub">${card.n} · ${card.suit === 'major' ? '大阿尔卡纳' : card.suit}</div>
+          <div class="modal-sub">${card.n} · ${card.suit === 'major' ? '大阿尔卡纳' : card.suit}${isRev ? ' · 逆位' : ''}${!hasCustomCardImage(card) && window.VELA.cardFace !== 'classic' ? ' · 经典牌补位' : ''}</div>
           ${meaning.kw ? `<div style="font-family:var(--font-head); font-size:16px; color:var(--accent); letter-spacing:.1em; margin-bottom:16px;">「${meaning.kw}」</div>` : ''}
           <div style="margin-bottom:16px;">
             <div style="font-family:var(--font-ui); font-size:11px; letter-spacing:.15em; color:var(--text-dim); text-transform:uppercase; margin-bottom:6px;">正位</div>
@@ -403,7 +431,7 @@
           <div style="text-align:center;">
             <div style="font-family:var(--font-ui); font-size:10px; color:var(--text-dim); margin-bottom:4px; letter-spacing:.05em;">${p.pos}</div>
             <div style="width:80px; height:128px; background:var(--surface); border-radius:var(--radius-sm); overflow:hidden; margin:0 auto;">
-              <img src="${getCardImage(DECK.find(c => c.id === p.cardId))}" style="width:100%;height:100%;object-fit:cover;${p.rev ? 'transform:rotate(180deg);' : ''}" onerror="this.outerHTML='<div class=&quot;card-front-fallback&quot; style=&quot;font-size:10px;&quot;>${CN_NAMES[p.cardId] || p.cardId}</div>'">
+              <img src="${getCardImage(DECK.find(c => c.id === p.cardId))}" style="width:100%;height:100%;object-fit:contain;${p.rev ? 'transform:rotate(180deg);' : ''}" onerror="this.outerHTML='<div class=&quot;card-front-fallback&quot; style=&quot;font-size:10px;&quot;>${CN_NAMES[p.cardId] || p.cardId}</div>'">
             </div>
             <div style="font-family:var(--font-head); font-size:11px; color:var(--accent); margin-top:4px;">${CN_NAMES[p.cardId] || p.cardId}${p.rev ? '(逆)' : ''}</div>
           </div>
@@ -460,8 +488,12 @@
       h.outcomeTs = Date.now();
       window.VELA.save();
       const base = (b.dataset.out === 'confirmed' || b.dataset.out === 'rebellion') ? 55 : 25;
-      window.VELA_POINTS.addPoints(base, '记录预言结果', { x: e.clientX, y: e.clientY });
-      if (b.dataset.out === 'confirmed') window.VELA_POINTS.unlock('first_outcome');
+      window.VELA_POINTS.addPoints(
+        base, '记录预言结果', { x: e.clientX, y: e.clientY },
+        b.dataset.out === 'rebellion' ? 'outcome_rebellion' : (base >= 55 ? 'outcome_high' : 'outcome_standard'),
+        String(h.ts)
+      );
+      window.VELA_POINTS.unlock('first_outcome');
       window.VELA_POINTS.checkProgressAchievements();
       window.VELA_APP?.updateLogBadge?.();
       m.classList.remove('visible');
@@ -659,8 +691,13 @@
     };
     window.VELA.history.unshift(entry);
     window.VELA.save();
-    window.VELA_POINTS.addPoints(window.VELA.currentSpread === 'daily' ? 15 : 20,
-      window.VELA.currentSpread === 'daily' ? '完成每日一牌' : '完成解读');
+    window.VELA_POINTS.addPoints(
+      window.VELA.currentSpread === 'daily' ? 15 : 20,
+      window.VELA.currentSpread === 'daily' ? '完成每日一牌' : '完成解读',
+      null,
+      window.VELA.currentSpread === 'daily' ? 'reading_daily' : 'reading',
+      String(entry.ts)
+    );
     window.VELA_POINTS.checkProgressAchievements();
 
     // Closing block: 柔和的收尾话 + 显著的回评入口
@@ -679,7 +716,7 @@
       const text = `${question || cfg.name}\n${entry.picked.map(p => `${p.pos}·${CN_NAMES[p.cardId]||p.cardId}${p.rev?'(逆)':''}`).join(' / ')}`;
       navigator.clipboard?.writeText(text);
       window.VELA_GESTURES.showTopToast('已复制分享摘要');
-      window.VELA_POINTS.addPoints(5, '分享解读');
+      window.VELA_POINTS.addPoints(5, '分享解读', null, 'share', String(entry.ts));
     };
     panel.querySelector('#ai-restart').onclick = () => { panel.classList.remove('visible'); resetToIdle(); };
     const send = async () => {
@@ -911,80 +948,84 @@
   }
 
   // ===== Store / Feedback / Redeem =====
-  function openStore() {
+  function openStore(tab = 'faces') {
     const m = document.getElementById('card-detail-modal');
-    const SKINS = [
-      { id: 'classic', name: '✦ 星辰经典', desc: '默认免费', pts: 0 },
-      { id: 'cat',     name: '🐱 猫咪密语', desc: '粉底·爪印', pts: 150 },
-      { id: 'divine',  name: '🏮 东方神明', desc: 'Chinese Divine 牌面', pts: 220 },
-      { id: 'botanic', name: '🌿 植物谜语', desc: 'Botanical Codex 牌面', pts: 220 },
-      { id: 'zodiac',  name: '⭐ 星座天穹', desc: '宇宙蓝·星座线', pts: 200 },
-      { id: 'rose',    name: '🥀 哥特玫瑰', desc: '深红·荆棘', pts: 250 },
-      { id: 'ink',     name: '🎋 水墨仙境', desc: '白底·竹叶', pts: 300 },
-      { id: 'aurora',  name: '🌌 极光迷离', desc: '动态极光', pts: 350 }
-    ];
+    const isFaces = tab === 'faces';
+    const skins = isFaces ? FACE_SKINS : BACK_SKINS;
+    const owned = isFaces ? window.VELA.unlocked.faces : window.VELA.unlocked.backs;
+    const active = isFaces ? window.VELA.cardFace : window.VELA.cardBack;
+    const backPreview = {
+      classic: 'assets/tarot/pkt/ar00.jpg',
+      cat: 'cat/cat_card_back.png',
+      divine: 'chinese god and godness/chinese_divine_card_back.png',
+      botanical: 'tree/botanical_codex_card_back.png'
+    };
     m.querySelector('.modal-card').innerHTML = `
       <button class="modal-close" data-close>×</button>
-      <h2>皮肤商店</h2>
-      <div class="modal-sub">用积分解锁专属牌背 · 当前余额 ✦ ${window.VELA.points.toLocaleString()}</div>
-      <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:14px;">
-        ${SKINS.map(s => {
-          const owned = window.VELA.unlocked.backs.includes(s.id);
-          const active = window.VELA.cardBack === s.id;
-          return `<div style="padding:12px; background:var(--surface); border:1px solid ${active ? 'var(--accent)' : 'var(--border)'}; border-radius:var(--radius-md);">
-            <div style="aspect-ratio:0.66; border-radius:var(--radius-sm); overflow:hidden; margin-bottom:10px;" class="store-preview" data-skin="${s.id}"></div>
-            <div style="font-family:var(--font-head); font-size:13px; color:var(--accent); margin-bottom:2px;">${s.name}</div>
-            <div style="font-family:var(--font-ui); font-size:11px; color:var(--text-dim); margin-bottom:8px;">${s.desc}</div>
-            ${owned
-              ? (active
+      <h2>牌面与牌背商店</h2>
+      <div class="modal-sub">牌面和牌背可自由搭配 · 当前余额 ✦ ${window.VELA.points.toLocaleString()}</div>
+      <div class="skin-tabs">
+        <button class="skin-tab ${isFaces ? 'active' : ''}" data-store-tab="faces">牌面皮肤</button>
+        <button class="skin-tab ${!isFaces ? 'active' : ''}" data-store-tab="backs">牌背皮肤</button>
+      </div>
+      ${isFaces ? '<div style="font-family:var(--font-ui);font-size:11px;color:var(--text-dim);margin-bottom:12px;">未完成的牌会自动使用经典牌补位，不会影响抽牌、逆位或解读。</div>' : ''}
+      <div class="skin-grid">
+        ${Object.entries(skins).map(([id, s]) => {
+          const isOwned = owned.includes(id);
+          const isActive = active === id;
+          const preview = isFaces ? s.cover : backPreview[id];
+          return `<div class="skin-card ${isActive ? 'active' : ''}">
+            <div class="skin-preview">
+              <img src="${preview}" alt="${s.name}">
+              ${isFaces ? `<span class="skin-coverage">${s.coverage} / 78 张</span>` : ''}
+            </div>
+            <div style="font-family:var(--font-head); font-size:13px; color:var(--accent); margin-bottom:2px;">${s.icon} ${s.name}</div>
+            <div style="font-family:var(--font-ui); font-size:11px; color:var(--text-dim); margin-bottom:8px; min-height:28px;">${s.desc}</div>
+            ${isOwned
+              ? (isActive
                   ? '<div style="font-size:12px; color:var(--accent); letter-spacing:.05em;">✓ 当前使用</div>'
-                  : `<button class="topbar-btn" data-use="${s.id}" style="width:100%; justify-content:center;">使用</button>`)
-              : `<button class="topbar-btn" data-buy="${s.id}" data-pts="${s.pts}" style="width:100%; justify-content:center;">${s.pts} 积分解锁</button>`
+                  : `<button class="topbar-btn" data-use="${id}" style="width:100%; justify-content:center;">使用</button>`)
+              : `<button class="topbar-btn" data-buy="${id}" data-pts="${s.price}" style="width:100%; justify-content:center;">${s.price} 积分解锁</button>`
             }
           </div>`;
         }).join('')}
       </div>
     `;
-    // Render previews
-    m.querySelectorAll('.store-preview').forEach(prev => {
-      const skin = prev.dataset.skin;
-      const backImg = getCardBackImage(skin);
-      prev.innerHTML = `<div class="card-back${backImg ? ' image-back' : ''}" data-skin="${skin}" style="width:100%; height:100%; position:relative;">
-        <div class="card-back-inner" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center;">
-          <svg viewBox="0 0 100 100" style="width:60%; height:60%;">
-            <circle cx="50" cy="50" r="40" fill="none" stroke-width="0.5"/>
-            <circle cx="50" cy="50" r="20" fill="none" stroke-width="0.5"/>
-            <circle cx="50" cy="50" r="3" fill="currentColor"/>
-          </svg>
-        </div>
-      </div>`;
-      // Force skin-specific style via inline override (since body[data-cardback] only affects whole body)
-      const cb = prev.querySelector('.card-back');
-      cb.style.background = getSkinBg(skin);
-      if (backImg) cb.style.backgroundImage = `url("${backImg}")`;
-      const svg = prev.querySelector('svg');
-      svg.style.stroke = getSkinStroke(skin);
-      if (backImg) svg.style.display = 'none';
-    });
     m.querySelector('[data-close]').onclick = () => m.classList.remove('visible');
-    m.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => {
+    m.querySelectorAll('[data-store-tab]').forEach(b => b.onclick = () => openStore(b.dataset.storeTab));
+    m.querySelectorAll('[data-buy]').forEach(b => b.onclick = async () => {
       const pts = parseInt(b.dataset.pts);
+      if (window.VELA_CLOUD?.isSignedIn?.()) {
+        try {
+          await window.VELA_CLOUD.purchaseSkin(isFaces ? 'faces' : 'backs', b.dataset.buy);
+          window.VELA_GESTURES.showTopToast(`已解锁 ${skins[b.dataset.buy].name}`);
+          openStore(tab);
+        } catch (e) {
+          window.VELA_GESTURES.showTopToast(e.message || '购买失败');
+        }
+        return;
+      }
       if (window.VELA.points >= pts) {
-        window.VELA.unlocked.backs.push(b.dataset.buy);
+        owned.push(b.dataset.buy);
         window.VELA.points -= pts;
         window.VELA_POINTS.updatePointsDisplay();
         window.VELA.save();
-        openStore();
+        window.VELA_GESTURES.showTopToast(`已解锁 ${skins[b.dataset.buy].name}`);
+        openStore(tab);
       } else {
         window.VELA_GESTURES.showTopToast(`还差 ${pts - window.VELA.points} 积分`);
       }
     });
     m.querySelectorAll('[data-use]').forEach(b => b.onclick = () => {
-      window.VELA.cardBack = b.dataset.use;
-      document.body.setAttribute('data-cardback', b.dataset.use);
+      if (isFaces) {
+        window.VELA.cardFace = b.dataset.use;
+      } else {
+        window.VELA.cardBack = b.dataset.use;
+        document.body.setAttribute('data-cardback', b.dataset.use);
+      }
       window.VELA.save();
-      window.VELA_GESTURES.showTopToast('已切换牌背');
-      openStore();
+      window.VELA_GESTURES.showTopToast(`已切换${isFaces ? '牌面' : '牌背'}：${skins[b.dataset.use].name}`);
+      openStore(tab);
     });
     m.classList.add('visible');
   }
@@ -992,8 +1033,6 @@
   function getSkinBg(skin) {
     switch (skin) {
       case 'cat': return 'radial-gradient(circle at 20% 30%, rgba(255,255,255,0.4) 6px, transparent 7px), radial-gradient(circle at 70% 60%, rgba(255,255,255,0.35) 5px, transparent 6px), linear-gradient(135deg, #f5b8c8, #e89bb0)';
-      case 'divine': return 'linear-gradient(135deg, #09142e, #142653)';
-      case 'botanic': return 'linear-gradient(135deg, #e9dfc7, #bca879)';
       case 'zodiac': return 'radial-gradient(circle at center, #1a2b5e, #050816)';
       case 'rose': return 'radial-gradient(circle at 50% 50%, rgba(160,30,40,0.4), transparent 60%), linear-gradient(135deg, #2a0408, #500818, #1a0204)';
       case 'ink': return '#faf8f3';
@@ -1004,8 +1043,6 @@
   function getSkinStroke(skin) {
     switch (skin) {
       case 'cat': return 'rgba(255,255,255,0.7)';
-      case 'divine': return '#d8b55d';
-      case 'botanic': return '#6d5b35';
       case 'zodiac': return 'rgba(180,200,255,0.6)';
       case 'rose': return '#d83a52';
       case 'ink': return '#2a2a2a';
@@ -1019,14 +1056,21 @@
     m.querySelector('.modal-card').innerHTML = `
       <button class="modal-close" data-close>×</button>
       <h2>📮 给星辰的一封信</h2>
-      <div class="modal-sub">每条被采纳的建议获得 150 积分 + 专属成就，承诺7天内回复</div>
+      <div class="modal-sub">${window.VELA_CLOUD?.isSignedIn?.()
+        ? '提交即得 5 积分；建议被采纳后自动获得 150 积分与专属成就'
+        : '提交即得 5 本地积分；建议被采纳后将通过邮件回复奖励方式'}</div>
+      <div style="font-family:var(--font-ui);font-size:11px;color:var(--text-dim);line-height:1.7;margin-bottom:14px;">
+        ${window.VELA_CLOUD?.isSignedIn?.()
+          ? '反馈将直接进入 VELA 管理后台。管理员点击采纳后，奖励会自动进入你的账户。'
+          : '当前为本地模式。点击发送会打开邮件应用，并创建发往 <strong style="color:var(--accent);">18926135948@163.com</strong> 的邮件。'}
+      </div>
       <div class="field">
         <textarea id="fb-text" placeholder="说说你对 VELA 的想法、建议、希望看到的功能…" maxlength="500"></textarea>
       </div>
-      <button class="btn-primary" id="fb-send" style="width:100%;">发送 (+5 积分)</button>
+      <button class="btn-primary" id="fb-send" style="width:100%;">${window.VELA_CLOUD?.isSignedIn?.() ? '提交反馈' : '打开邮件并提交'} (+5 积分)</button>
     `;
     m.querySelector('[data-close]').onclick = () => m.classList.remove('visible');
-    m.querySelector('#fb-send').onclick = (e) => {
+    m.querySelector('#fb-send').onclick = async (e) => {
       const t = m.querySelector('#fb-text').value.trim();
       if (!t) return;
       const lastFb = storage.get('vela_fb_day');
@@ -1036,11 +1080,30 @@
         return;
       }
       storage.set('vela_fb_day', window.VELA_UTIL.dayKey());
+      if (window.VELA_CLOUD?.isSignedIn?.()) {
+        try {
+          const result = await window.VELA_CLOUD.submitFeedback(t);
+          window.VELA_POINTS.addPoints(5, '提交反馈', { x: e.clientX, y: e.clientY }, 'feedback', result.id);
+          window.VELA_GESTURES.showTopToast('反馈已安全送达，采纳后将自动获得 150 积分');
+          m.classList.remove('visible');
+        } catch (err) {
+          window.VELA_GESTURES.showTopToast(err.message || '反馈提交失败');
+        }
+        return;
+      }
       const fb = storage.get('vela_feedback_history', []);
-      fb.push({ text: t, ts: Date.now() });
+      const feedbackId = `VELA-FB-${Date.now().toString(36).toUpperCase()}`;
+      fb.push({ id: feedbackId, text: t, ts: Date.now(), status: 'submitted' });
       storage.set('vela_feedback_history', fb);
-      window.VELA_POINTS.addPoints(5, '提交反馈', { x: e.clientX, y: e.clientY });
-      window.VELA_GESTURES.showTopToast('已记录，星辰收到了 ✨');
+      window.VELA_POINTS.addPoints(5, '提交反馈', { x: e.clientX, y: e.clientY }, 'feedback', feedbackId);
+      const subject = encodeURIComponent(`[VELA反馈] ${feedbackId}`);
+      const body = encodeURIComponent(
+        `反馈编号：${feedbackId}\n\n${t}\n\n---\n若此建议被采纳，请回复此邮件并提供 150 积分专属兑换码。`
+      );
+      const a = document.createElement('a');
+      a.href = `mailto:18926135948@163.com?subject=${subject}&body=${body}`;
+      a.click();
+      window.VELA_GESTURES.showTopToast('已记录，请在邮件应用中确认发送');
       m.classList.remove('visible');
     };
     m.classList.add('visible');
@@ -1058,9 +1121,19 @@
       <button class="btn-primary" id="rd-ok" style="width:100%;">兑换</button>
     `;
     m.querySelector('[data-close]').onclick = () => m.classList.remove('visible');
-    m.querySelector('#rd-ok').onclick = (e) => {
+    m.querySelector('#rd-ok').onclick = async (e) => {
       const code = (m.querySelector('#rd-code').value || '').trim().toUpperCase();
       if (!code) return;
+      if (window.VELA_CLOUD?.isSignedIn?.()) {
+        try {
+          const result = await window.VELA_CLOUD.redeemCode(code);
+          window.VELA_GESTURES.showTopToast(`兑换成功 +${result.awarded} 积分`);
+          m.classList.remove('visible');
+        } catch (err) {
+          window.VELA_GESTURES.showTopToast(err.message || '兑换失败');
+        }
+        return;
+      }
       // demo: only one valid code: VELA-WELCOME → 100 pts
       const CODES = { 'VELA-WELCOME': 100, 'VELA-STARS': 50 };
       if (window.VELA.usedCodes.includes(code)) {

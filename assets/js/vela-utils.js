@@ -57,6 +57,7 @@ window.VELA = {
   currentTone: storage.get('vela_tone', 'balanced'),
   currentMood: null,
   cardBack: storage.get('vela_cardback', 'classic'),
+  cardFace: storage.get('vela_cardface', 'classic'),
 
   // deck / picking
   deck: [],
@@ -71,11 +72,12 @@ window.VELA = {
   history: storage.get('vela_history', []),
   achievements: storage.get('vela_achievements', {}),
   viewedCards: storage.get('vela_viewed_cards', []),
-  unlocked: storage.get('vela_unlocked', { themes: ['A','B'], backs: ['classic'] }),
+  unlocked: storage.get('vela_unlocked', { themes: ['A','B'], backs: ['classic'], faces: ['classic'] }),
   usedCodes: storage.get('vela_used_codes', []),
 
   // settings
   prefs: storage.get('vela_prefs', {
+    gestureControl: !window.matchMedia('(pointer: coarse)').matches,
     cameraPreview: false,
     haptics: true,
     simpleAnim: false,
@@ -100,7 +102,21 @@ window.VELA = {
     storage.set('vela_theme', this.currentTheme);
     storage.set('vela_tone', this.currentTone);
     storage.set('vela_cardback', this.cardBack);
+    storage.set('vela_cardface', this.cardFace);
+    window.VELA_CLOUD?.scheduleSync?.();
   }
 };
+
+// Migrate older local saves that predate face skins.
+window.VELA.unlocked.themes ||= ['A', 'B'];
+window.VELA.unlocked.backs ||= ['classic'];
+window.VELA.unlocked.faces ||= ['classic'];
+window.VELA.prefs.gestureControl ??= !window.matchMedia('(pointer: coarse)').matches;
+window.VELA.prefs.cameraPreview ??= false;
+window.VELA.prefs.haptics ??= true;
+window.VELA.prefs.simpleAnim ??= false;
+window.VELA.prefs.apiKey ??= '';
+if (!window.VELA.unlocked.backs.includes('classic')) window.VELA.unlocked.backs.unshift('classic');
+if (!window.VELA.unlocked.faces.includes('classic')) window.VELA.unlocked.faces.unshift('classic');
 
 window.VELA_UTIL = { storage, $, $$, el, fmtTime, dayKey };

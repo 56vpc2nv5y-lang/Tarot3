@@ -254,6 +254,7 @@
     document.getElementById('btn-settings')?.addEventListener('click', M.openSettings);
     document.getElementById('btn-log')?.addEventListener('click', M.openLog);
     document.getElementById('btn-points')?.addEventListener('click', M.openPointsHistory);
+    document.getElementById('btn-account')?.addEventListener('click', () => window.VELA_CLOUD?.openAuth?.());
     document.getElementById('checkin-claim')?.addEventListener('click', (e) => P.doCheckin(e));
     document.getElementById('help-btn')?.addEventListener('click', () => G.showOnboarding(true));
     document.getElementById('onboard-ok')?.addEventListener('click', () => {
@@ -306,6 +307,7 @@
     // theme + canvas
     T.applyTheme(window.VELA.currentTheme);
     document.body.setAttribute('data-cardback', window.VELA.cardBack || 'classic');
+    document.body.classList.toggle('simple-anim', !!window.VELA.prefs.simpleAnim);
     T.initStarsCanvas();
     T.buildMandala();
     G.initGestureUI();
@@ -326,10 +328,11 @@
 
     await preloadAssets();
     renderIdle();
-    G.showOnboarding();
+    const authReady = !window.VELA_CLOUD?.enabled || window.VELA_CLOUD?.isSignedIn?.();
+    if (window.VELA.prefs.gestureControl && authReady) G.showOnboarding();
 
     // Start camera in background (don't block UI)
-    G.startCamera().catch(() => {});
+    if (window.VELA.prefs.gestureControl && authReady) G.startCamera().catch(() => {});
   }
 
   function updateLogBadge() {

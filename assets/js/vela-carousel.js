@@ -3,7 +3,7 @@
    ============================================================ */
 (function() {
   const { $, $$, el } = window.VELA_UTIL;
-  const { DECK, CN_NAMES, SPREADS, MEANINGS, getCardImage, getCardBackImage } = window.VELA_DATA;
+  const { DECK, CN_NAMES, SPREADS, MEANINGS, getCardImage, hasCustomCardImage } = window.VELA_DATA;
 
   // shuffle helper
   function shuffle(arr) {
@@ -49,13 +49,9 @@
 
   function makeCardEl(card, opts = {}) {
     const shell = el('div', { class: 'card-shell' + (opts.reversed ? ' reversed' : '') });
-    const backImg = getCardBackImage?.();
     const back = el('div', { class: 'card-face back' },
-      el('div', {
-        class: 'card-back' + (backImg ? ' image-back' : ''),
-        style: backImg ? { backgroundImage: `url("${backImg}")` } : {}
-      },
-        backImg ? '' : el('div', { class: 'card-back-inner', html: backSVG() })
+      el('div', { class: 'card-back' },
+        el('div', { class: 'card-back-inner', html: backSVG() })
       )
     );
     const front = el('div', { class: 'card-face front' });
@@ -68,6 +64,10 @@
       front.replaceChild(fb, img);
     };
     front.appendChild(img);
+    if (opts.reversed) front.appendChild(el('div', { class: 'reversed-marker' }, '↻ 逆位'));
+    if (!hasCustomCardImage(card) && window.VELA.cardFace !== 'classic') {
+      front.appendChild(el('div', { class: 'classic-fallback-marker', title: '此牌面尚未完成，暂用经典牌' }, '经典补位'));
+    }
     shell.appendChild(back);
     shell.appendChild(front);
     return shell;
@@ -205,18 +205,20 @@
     const cfg = SPREADS[window.VELA.currentSpread];
     if (window.VELA.picked.length >= cfg.count) return;
 
-    const card = window.VELA.deck[centerIdx];
-    if (!card) return;
+    const selectedIdx = lockedIdx >= 0 ? lockedIdx : centerIdx;
+    const card = window.VELA.deck[selectedIdx];
+    if (!card) return false;
     if (window.VELA.picked.find(p => p.card.id === card.id)) {
-      // ringing — already picked
-      return;
+      window.VELA_GESTURES?.showTopToast?.('这张牌已经选过了，请换一张');
+      lockedIdx = -1;
+      return false;
     }
     const rev = Math.random() < 0.3;
     const pos = cfg.positions[window.VELA.picked.length];
     window.VELA.picked.push({ card, rev, pos });
 
     // bounce + flash on selected card
-    const wrap = carouselEls[centerIdx];
+    const wrap = carouselEls[selectedIdx];
     if (wrap) {
       wrap.classList.add('charged-flash');
       wrap.animate(
@@ -236,6 +238,8 @@
     if (window.VELA.picked.length >= cfg.count) {
       onCompleteCb?.();
     }
+    lockedIdx = -1;
+    return true;
   }
 
   let onCompleteCb = null;
@@ -250,9 +254,12 @@
       const fb = el('div', { class: 'card-front-fallback', style: { fontSize: '10px' } }, CN_NAMES[card.id] || card.n);
       s.innerHTML = ''; s.appendChild(fb); s.appendChild(el('div', { class: 'pos-tag' }, pos));
     };
-    if (rev) img.style.transform = 'rotate(180deg)';
+    if (rev) {
+      img.style.transform = 'rotate(180deg)';
+      s.classList.add('reversed');
+    }
     s.appendChild(img);
-    s.appendChild(el('div', { class: 'pos-tag' }, pos));
+    s.appendChild(el('div', { class: 'pos-tag' }, pos + (rev ? ' · 逆位' : '')));
     // replace placeholder
     const placeholder = slots.querySelector('.slot:not(.filled)');
     if (placeholder) slots.replaceChild(s, placeholder);
@@ -288,7 +295,7 @@
       wrap.appendChild(el('div', { class: 'pos-label' }, p.pos));
       const shell = makeCardEl(p.card, { reversed: p.rev });
       wrap.appendChild(shell);
-      wrap.appendChild(el('div', { class: 'card-name' }, CN_NAMES[p.card.id] || p.card.n));
+      wrap.appendChild(el('div', { class: 'card-name' }, `${CN_NAMES[p.card.id] || p.card.n}${p.rev ? ' · 逆位' : ''}`));
       wrap.addEventListener('click', () => {
         window.VELA_MODALS?.openCardDetail?.(p.card, p.rev);
       });

@@ -29,6 +29,10 @@
   }
   const isFist = lm => avgDist(lm) < 0.23;
   const isPalm = lm => avgDist(lm) > 0.40;
+  const isPinch = lm => Math.hypot(lm[4].x-lm[8].x, lm[4].y-lm[8].y) < 0.055;
+  const fingerUp = (lm, tip, pip) => lm[tip].y < lm[pip].y - 0.025;
+  const isVictory = lm => fingerUp(lm, 8, 6) && fingerUp(lm, 12, 10) &&
+    !fingerUp(lm, 16, 14) && !fingerUp(lm, 20, 18);
 
   function showTopToast(text) {
     let t = document.querySelector('.top-toast');
@@ -79,6 +83,24 @@
     }
   }
 
+  function castSpell(x, y, rune = '✦') {
+    const cast = document.createElement('div');
+    cast.className = 'magic-cast';
+    cast.style.left = x + 'px';
+    cast.style.top = y + 'px';
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      const s = document.createElement('span');
+      s.textContent = i % 2 ? rune : '·';
+      s.style.setProperty('--mx', `${Math.cos(a) * (45 + Math.random() * 35)}px`);
+      s.style.setProperty('--my', `${Math.sin(a) * (45 + Math.random() * 35)}px`);
+      s.style.setProperty('--mr', `${Math.round(Math.random() * 180)}deg`);
+      cast.appendChild(s);
+    }
+    document.body.appendChild(cast);
+    setTimeout(() => cast.remove(), 1000);
+  }
+
   function findNearestCardIndex(x, y) {
     // simplified: use horizontal position relative to scene to choose nearest of currently visible cards
     const carousel = document.querySelector('.carousel');
@@ -101,14 +123,16 @@
     if (window.VELA.isPaused) return;
     if (!results || !results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
       lastLandmarks = null;
+      if (!lostSince) lostSince = performance.now();
       // graceful fade
       if (chargeStart && performance.now() - lostSince > 600) {
         chargeStart = 0;
         chargeMode = null;
+        chargeTargetIdx = -1;
+        cursorEl?.classList.remove('locked');
         ringEl?.classList.add('fading');
         ringFg && (ringFg.style.strokeDashoffset = 176);
       }
-      if (!lostSince) lostSince = performance.now();
       if (camActive && window.VELA.state === 'PICKING') {
         setStatus('请将手放入画面');
       }
@@ -136,32 +160,59 @@
     // Detect gesture
     const fist = isFist(lm);
     const palm = isPalm(lm);
+    const pinch = isPinch(lm);
+    const victory = isVictory(lm);
 
     if (window.VELA.state === 'PICKING') {
       // horizontal zones: left third / middle / right third
       const px = x / innerWidth;
       const cur = window.VELA_CAROUSEL.getCenterIndex();
-      if (palm) {
+      if (pinch) {
+        const targetIdx = findNearestCardIndex(x, y);
+        window.VELA_CAROUSEL.setLockedIndex(targetIdx);
+        if (chargeMode !== 'pinch' || chargeTargetIdx !== targetIdx) {
+          chargeMode = 'pinch';
+          chargeTargetIdx = targetIdx;
+          chargeStart = performance.now();
+          cursorEl?.classList.add('locked');
+        }
+        const p = Math.min(1, (performance.now() - chargeStart) / 420);
+        setRingProgress(p);
+        setStatus('捏合聚焦 · 松手前锁定此牌');
+        if (p >= 1) {
+          const selected = window.VELA_CAROUSEL.selectCenter();
+          chargeStart = 0; chargeMode = null; chargeTargetIdx = -1;
+          cursorEl?.classList.remove('locked');
+          setRingProgress(0);
+          if (selected) {
+            castSpell(x, y, '✦');
+            setStatus('牌已回应你的召唤');
+          }
+        }
+      } else if (palm) {
         if (px < 0.33) {
           // scroll left
           window.VELA_CAROUSEL.scrollBy(-(0.33 - px) * 0.6);
           window.VELA_CAROUSEL.setLockedIndex(-1);
-          chargeStart = 0; chargeMode = null;
+          chargeStart = 0; chargeMode = null; chargeTargetIdx = -1;
+          cursorEl?.classList.remove('locked');
           setRingProgress(0);
           setStatus('← 向左浏览');
         } else if (px > 0.67) {
           window.VELA_CAROUSEL.scrollBy((px - 0.67) * 0.6);
           window.VELA_CAROUSEL.setLockedIndex(-1);
-          chargeStart = 0; chargeMode = null;
+          chargeStart = 0; chargeMode = null; chargeTargetIdx = -1;
+          cursorEl?.classList.remove('locked');
           setRingProgress(0);
           setStatus('向右浏览 →');
         } else {
           // middle zone → magnetic snap + charge
           const snapIdx = findNearestCardIndex(x, y);
-          window.VELA_CAROUSEL.setLockedIndex(snapIdx >= 0 ? snapIdx : cur);
+          const targetIdx = snapIdx >= 0 ? snapIdx : cur;
+          window.VELA_CAROUSEL.setLockedIndex(targetIdx);
           // bounce when newly locked
-          if (chargeTargetIdx !== snapIdx) {
-            chargeTargetIdx = snapIdx;
+          if (chargeTargetIdx !== targetIdx) {
+            chargeTargetIdx = targetIdx;
             chargeStart = performance.now();
             chargeMode = 'palm-hover';
             cursorEl?.classList.add('locked');
@@ -172,31 +223,45 @@
           setStatus('握住选中此牌…');
           if (p >= 1) {
             chargeStart = 0; chargeMode = null;
-            window.VELA_CAROUSEL.selectCenter();
+            const selected = window.VELA_CAROUSEL.selectCenter();
+            chargeTargetIdx = -1;
+            cursorEl?.classList.remove('locked');
             setRingProgress(0);
+            if (selected) {
+              castSpell(x, y, '◇');
+              setStatus('已选中 · 张开手掌继续浏览');
+            }
           }
         }
       } else if (fist) {
         // not used in PICKING for selection; could be cancel
-        chargeStart = 0; chargeMode = null;
+        chargeStart = 0; chargeMode = null; chargeTargetIdx = -1;
         cursorEl?.classList.remove('locked');
+        window.VELA_CAROUSEL.setLockedIndex(-1);
         setRingProgress(0);
       } else {
-        chargeStart = 0; chargeMode = null;
+        chargeStart = 0; chargeMode = null; chargeTargetIdx = -1;
         cursorEl?.classList.remove('locked');
         window.VELA_CAROUSEL.setLockedIndex(-1);
         setRingProgress(0);
         setStatus('张开手掌选牌');
       }
     } else if (window.VELA.state === 'IDLE' || window.VELA.state === 'INTERPRETING') {
-      // fist 0.8s to start / trigger AI
-      if (fist) {
-        if (!chargeStart) { chargeStart = performance.now(); chargeMode = 'fist'; }
+      // Fist begins a reading; a V sign opens interpretation after cards are revealed.
+      const ritual = window.VELA.state === 'INTERPRETING' ? victory : fist;
+      const ritualMode = window.VELA.state === 'INTERPRETING' ? 'victory' : 'fist';
+      if (ritual) {
+        if (!chargeStart || chargeMode !== ritualMode) {
+          chargeStart = performance.now();
+          chargeMode = ritualMode;
+        }
         const p = Math.min(1, (performance.now() - chargeStart) / CHARGE_MS);
         setRingProgress(p);
+        setStatus(window.VELA.state === 'INTERPRETING' ? '双指成印 · 开启星辰解读' : '握拳蓄力 · 开启占卜');
         if (p >= 1) {
           chargeStart = 0; chargeMode = null;
           setRingProgress(0);
+          castSpell(x, y, window.VELA.state === 'INTERPRETING' ? 'V' : '✦');
           onChargeComplete?.();
         }
       } else {
@@ -214,6 +279,8 @@
   }
 
   async function startCamera() {
+    if (camActive) return true;
+    videoEl?.remove();
     videoEl = document.createElement('video');
     videoEl.style.display = 'none';
     document.body.appendChild(videoEl);
@@ -266,6 +333,21 @@
     }
   }
 
+  async function setGestureEnabled(on) {
+    if (on) {
+      const ok = await startCamera();
+      if (ok) showTopToast('手势控制已开启');
+      return ok;
+    }
+    try { mpCamera?.stop?.(); } catch {}
+    try { videoEl?.srcObject?.getTracks?.().forEach(t => t.stop()); } catch {}
+    camActive = false;
+    setCursorVisible(false);
+    document.getElementById('cam-preview')?.classList.remove('visible');
+    showTopToast('手势控制已关闭，仍可使用鼠标、触摸和键盘');
+    return true;
+  }
+
   function showOnboarding(force = false) {
     const seen = storage.get('vela_gesture_seen', false);
     if (seen && !force) return;
@@ -293,6 +375,7 @@
 
   window.VELA_GESTURES = {
     initGestureUI, startCamera, setCameraPreview,
+    setGestureEnabled,
     showOnboarding, dismissOnboarding,
     setOnChargeComplete, showTopToast, setStatus
   };

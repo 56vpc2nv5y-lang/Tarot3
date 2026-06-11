@@ -35,135 +35,107 @@ const DECK = (() => {
   return c;
 })();
 
-const IMAGE_DECKS = {
+// Custom face skins may be incomplete while artwork is still being produced.
+// Missing cards always fall back to the complete classic RWS deck.
+const CAT_MAJOR = [
+  'fool','magician','high_priestess','empress','emperor','hierophant','lovers','chariot',
+  'strength','hermit','wheel_of_fortune','justice','hanged_man','death','temperance',
+  'devil','tower','star','moon','sun','judgement','world'
+];
+const DIVINE_MAJOR = [
+  'fool_nezha','magician_jiang_ziya','high_priestess_zhinv','empress_xi_wangmu',
+  'emperor_yu_huang_dadi','hierophant_taishang_laojun','lovers_niulang_zhinv',
+  'chariot_sun_wukong','strength_erlang_shen','hermit_zhongli_quan',
+  'wheel_of_fortune_taiyi_zhenren','justice_bao_zheng','hanged_one_nezha_sacrifice',
+  'death_heibai_wuchang','temperance_guanyin','devil_demon_pill','tower_gonggong',
+  'star_chang_e','moon_yue_lao','sun_hou_yi','judgement_fengshen_bang','world_pangu'
+];
+const BOTANIC_MAJOR = [
+  'fool_dandelion','magician_ginseng','high_priestess_evening_primrose','empress_rose',
+  'emperor_oak','hierophant_laurel','lovers_honeysuckle','chariot_morning_glory',
+  'strength_valerian','hermit_moss','wheel_of_fortune_sunflower','justice_iris',
+  'hanged_one_mistletoe','death_poppy','temperance_lavender'
+];
+const RANK_FILE = {
+  ac: '01_ace', '02': '02_two', '03': '03_three', '04': '04_four', '05': '05_five',
+  '06': '06_six', '07': '07_seven', '08': '08_eight', '09': '09_nine', '10': '10_ten',
+  pa: 'page', kn: 'knight', qu: 'queen', ki: 'king'
+};
+const SUIT_FILE = { wa: 'wands', cu: 'cups', sw: 'swords', pe: 'pentacles' };
+const CAT_MAJOR_AVAILABLE = new Set([
+  'ar00','ar01','ar02','ar03','ar04','ar06','ar07','ar08','ar09','ar10','ar11',
+  'ar13','ar14','ar15','ar16','ar17','ar18','ar19','ar20','ar21'
+]);
+const CAT_MINOR_AVAILABLE = new Set([
+  ...['wa','cu'].flatMap(s => Object.keys(RANK_FILE).map(r => s + r)),
+  ...Object.keys(RANK_FILE).filter(r => r !== 'ki').map(r => 'sw' + r),
+  'peac'
+]);
+const DIVINE_AVAILABLE = new Set([
+  ...Array.from({ length: 22 }, (_, i) => `ar${String(i).padStart(2, '0')}`).filter(id => id !== 'ar07'),
+  'waac','wa02','wa03'
+]);
+const BOTANIC_AVAILABLE = new Set(Array.from({ length: 15 }, (_, i) => `ar${String(i).padStart(2, '0')}`));
+
+const FACE_SKINS = {
+  classic: {
+    name: '韦特经典', icon: '✦', price: 0, coverage: 78,
+    desc: '完整 78 张 · 默认牌面', cover: 'assets/tarot/pkt/ar00.jpg'
+  },
   cat: {
-    back: 'cat/cat_card_back.png',
-    cards: {
-      ar00: 'cat/cat_major_00_fool.png',
-      ar01: 'cat/cat_major_01_magician.png',
-      ar02: 'cat/cat_major_02_high_priestess.png',
-      ar03: 'cat/cat_major_03_empress.png',
-      ar04: 'cat/cat_major_04_emperor.png',
-      ar06: 'cat/cat_major_06_lovers.png',
-      ar07: 'cat/cat_major_07_chariot.png',
-      ar08: 'cat/cat_major_08_strength.png',
-      ar09: 'cat/cat_major_09_hermit.png',
-      ar10: 'cat/cat_major_10_wheel_of_fortune.png',
-      ar11: 'cat/cat_major_11_justice.png',
-      ar13: 'cat/cat_major_13_death.png',
-      ar14: 'cat/cat_major_14_temperance.png',
-      ar15: 'cat/cat_major_15_devil.png',
-      ar16: 'cat/cat_major_16_tower.png',
-      ar17: 'cat/cat_major_17_star.png',
-      ar18: 'cat/cat_major_18_moon.png',
-      ar19: 'cat/cat_major_19_sun.png',
-      ar20: 'cat/cat_major_20_judgement.png',
-      ar21: 'cat/cat_major_21_world.png',
-      waac: 'cat/cat_wands_01_ace.png',
-      wa02: 'cat/cat_wands_02_two.png',
-      wa03: 'cat/cat_wands_03_three.png',
-      wa04: 'cat/cat_wands_04_four.png',
-      wa05: 'cat/cat_wands_05_five.png',
-      wa06: 'cat/cat_wands_06_six.png',
-      wa07: 'cat/cat_wands_07_seven.png',
-      wa08: 'cat/cat_wands_08_eight.png',
-      wa09: 'cat/cat_wands_09_nine.png',
-      wa10: 'cat/cat_wands_10_ten.png',
-      wapa: 'cat/cat_wands_page.png',
-      wakn: 'cat/cat_wands_knight.png',
-      waqu: 'cat/cat_wands_queen.png',
-      waki: 'cat/cat_wands_king.png',
-      cuac: 'cat/cat_cups_01_ace.png',
-      cu02: 'cat/cat_cups_02_two.png',
-      cu03: 'cat/cat_cups_03_three.png',
-      cu04: 'cat/cat_cups_04_four.png',
-      cu05: 'cat/cat_cups_05_five.png',
-      cu06: 'cat/cat_cups_06_six.png',
-      cu07: 'cat/cat_cups_07_seven.png',
-      cu08: 'cat/cat_cups_08_eight.png',
-      cu09: 'cat/cat_cups_09_nine.png',
-      cu10: 'cat/cat_cups_10_ten.png',
-      cupa: 'cat/cat_cups_page.png',
-      cukn: 'cat/cat_cups_knight.png',
-      cuqu: 'cat/cat_cups_queen.png',
-      cuki: 'cat/cat_cups_king.png',
-      swac: 'cat/cat_swords_01_ace.png',
-      sw02: 'cat/cat_swords_02_two.png',
-      sw03: 'cat/cat_swords_03_three.png',
-      sw04: 'cat/cat_swords_04_four.png',
-      sw05: 'cat/cat_swords_05_five.png',
-      sw06: 'cat/cat_swords_06_six.png',
-      sw07: 'cat/cat_swords_07_seven.png',
-      sw08: 'cat/cat_swords_08_eight.png',
-      sw09: 'cat/cat_swords_09_nine.png',
-      sw10: 'cat/cat_swords_10_ten.png',
-      swpa: 'cat/cat_swords_page.png',
-      swkn: 'cat/cat_swords_knight.png',
-      swqu: 'cat/cat_swords_queen.png',
-      peac: 'cat/cat_pentacles_01_ace.png'
-    }
+    name: '猫咪密语', icon: '🐱', price: 520, coverage: CAT_MAJOR_AVAILABLE.size + CAT_MINOR_AVAILABLE.size,
+    desc: '温柔水彩 · 缺图自动使用经典牌', cover: 'cat/cat_major_00_fool.png'
   },
   divine: {
-    back: 'chinese%20god%20and%20godness/chinese_divine_card_back.png',
-    cards: {
-      ar00: 'chinese%20god%20and%20godness/divine_major_00_fool_nezha.png',
-      ar01: 'chinese%20god%20and%20godness/divine_major_01_magician_jiang_ziya.png',
-      ar02: 'chinese%20god%20and%20godness/divine_major_02_high_priestess_zhinv.png',
-      ar03: 'chinese%20god%20and%20godness/divine_major_03_empress_xi_wangmu.png',
-      ar04: 'chinese%20god%20and%20godness/divine_major_04_emperor_yu_huang_dadi.png',
-      ar05: 'chinese%20god%20and%20godness/divine_major_05_hierophant_taishang_laojun.png',
-      ar06: 'chinese%20god%20and%20godness/divine_major_06_lovers_niulang_zhinv.png',
-      ar08: 'chinese%20god%20and%20godness/divine_major_08_strength_erlang_shen.png',
-      ar09: 'chinese%20god%20and%20godness/divine_major_09_hermit_zhongli_quan.png',
-      ar10: 'chinese%20god%20and%20godness/divine_major_10_wheel_of_fortune_taiyi_zhenren.png',
-      ar11: 'chinese%20god%20and%20godness/divine_major_11_justice_bao_zheng.png',
-      ar12: 'chinese%20god%20and%20godness/divine_major_12_hanged_one_nezha_sacrifice.png',
-      ar13: 'chinese%20god%20and%20godness/divine_major_13_death_heibai_wuchang.png',
-      ar14: 'chinese%20god%20and%20godness/divine_major_14_temperance_guanyin.png',
-      ar15: 'chinese%20god%20and%20godness/divine_major_15_devil_demon_pill.png',
-      ar16: 'chinese%20god%20and%20godness/divine_major_16_tower_gonggong.png',
-      ar17: 'chinese%20god%20and%20godness/divine_major_17_star_chang_e.png',
-      ar18: 'chinese%20god%20and%20godness/divine_major_18_moon_yue_lao.png',
-      ar19: 'chinese%20god%20and%20godness/divine_major_19_sun_hou_yi.png',
-      ar20: 'chinese%20god%20and%20godness/divine_major_20_judgement_fengshen_bang.png',
-      ar21: 'chinese%20god%20and%20godness/divine_major_21_world_pangu.png',
-      waac: 'chinese%20god%20and%20godness/divine_wands_01_ace.png',
-      wa02: 'chinese%20god%20and%20godness/divine_wands_02_two.png',
-      wa03: 'chinese%20god%20and%20godness/divine_wands_03_three.png'
-    }
+    name: '东方神明', icon: '🏮', price: 420, coverage: DIVINE_AVAILABLE.size,
+    desc: '东方神话 · 缺图自动使用经典牌', cover: 'chinese god and godness/divine_major_14_temperance_guanyin.png'
   },
-  botanic: {
-    back: 'tree/botanical_codex_card_back.png',
-    cards: {
-      ar00: 'tree/botanic_major_00_fool_dandelion.png',
-      ar01: 'tree/botanic_major_01_magician_ginseng.png',
-      ar02: 'tree/botanic_major_02_high_priestess_evening_primrose.png',
-      ar03: 'tree/botanic_major_03_empress_rose.png',
-      ar04: 'tree/botanic_major_04_emperor_oak.png',
-      ar05: 'tree/botanic_major_05_hierophant_laurel.png',
-      ar06: 'tree/botanic_major_06_lovers_honeysuckle.png',
-      ar07: 'tree/botanic_major_07_chariot_morning_glory.png',
-      ar08: 'tree/botanic_major_08_strength_valerian.png',
-      ar09: 'tree/botanic_major_09_hermit_moss.png',
-      ar10: 'tree/botanic_major_10_wheel_of_fortune_sunflower.png',
-      ar11: 'tree/botanic_major_11_justice_iris.png',
-      ar12: 'tree/botanic_major_12_hanged_one_mistletoe.png',
-      ar13: 'tree/botanic_major_13_death_poppy.png',
-      ar14: 'tree/botanic_major_14_temperance_lavender.png'
-    }
+  botanical: {
+    name: '植物图鉴', icon: '🌿', price: 360, coverage: BOTANIC_AVAILABLE.size,
+    desc: '植物学图谱 · 缺图自动使用经典牌', cover: 'tree/botanic_major_10_wheel_of_fortune_sunflower.png'
   }
 };
 
-function getActiveDeckId() {
-  return IMAGE_DECKS[window.VELA?.cardBack] ? window.VELA.cardBack : null;
+const BACK_SKINS = {
+  classic:   { name: '星辰经典', icon: '✦', price: 0, desc: '默认牌背' },
+  cat:       { name: '猫咪密语', icon: '🐱', price: 180, desc: '粉色水彩 · 猫与月亮' },
+  divine:    { name: '东方神明', icon: '🏮', price: 220, desc: '太极八卦 · 天庭深蓝' },
+  botanical: { name: '植物图鉴', icon: '🌿', price: 160, desc: '羊皮纸 · 薰衣草图谱' }
+};
+
+function customCardImage(card, skin) {
+  if (!card || skin === 'classic') return null;
+  if (skin === 'cat') {
+    if (card.id.startsWith('ar') && CAT_MAJOR_AVAILABLE.has(card.id)) {
+      const i = Number(card.id.slice(2));
+      return `cat/cat_major_${String(i).padStart(2, '0')}_${CAT_MAJOR[i]}.png`;
+    }
+    if (CAT_MINOR_AVAILABLE.has(card.id)) {
+      const suit = SUIT_FILE[card.id.slice(0, 2)];
+      const rank = RANK_FILE[card.id.slice(2)];
+      return `cat/cat_${suit}_${rank}.png`;
+    }
+  }
+  if (skin === 'divine' && DIVINE_AVAILABLE.has(card.id)) {
+    if (card.id.startsWith('ar')) {
+      const i = Number(card.id.slice(2));
+      return `chinese god and godness/divine_major_${String(i).padStart(2, '0')}_${DIVINE_MAJOR[i]}.png`;
+    }
+    return `chinese god and godness/divine_wands_${RANK_FILE[card.id.slice(2)]}.png`;
+  }
+  if (skin === 'botanical' && BOTANIC_AVAILABLE.has(card.id)) {
+    const i = Number(card.id.slice(2));
+    return `tree/botanic_major_${String(i).padStart(2, '0')}_${BOTANIC_MAJOR[i]}.png`;
+  }
+  return null;
 }
 
-function getCardImage(card, deckId = getActiveDeckId()) {
-  return IMAGE_DECKS[deckId]?.cards?.[card?.id] || card?.img || '';
+function getCardImage(card, skin = window.VELA?.cardFace || 'classic') {
+  return customCardImage(card, skin) || card?.img || '';
 }
 
-function getCardBackImage(deckId = getActiveDeckId()) {
-  return IMAGE_DECKS[deckId]?.back || '';
+function hasCustomCardImage(card, skin = window.VELA?.cardFace || 'classic') {
+  return !!customCardImage(card, skin);
 }
 
 // 中文牌名映射
@@ -374,7 +346,6 @@ function getFuSys(t) {
 }
 
 window.VELA_DATA = {
-  DECK, CN_NAMES, SPREADS, MEANINGS, MOODS, IMAGE_DECKS,
-  getCardImage, getCardBackImage,
-  detectIntent, getMoonPhase, getSys, buildPmt, getFuSys
+  DECK, CN_NAMES, SPREADS, MEANINGS, MOODS, FACE_SKINS, BACK_SKINS,
+  getCardImage, hasCustomCardImage, detectIntent, getMoonPhase, getSys, buildPmt, getFuSys
 };

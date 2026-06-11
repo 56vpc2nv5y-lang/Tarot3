@@ -12,7 +12,7 @@
     fifty_readings:   { name: '🔮 先知',     desc: '累计完成50次解读',         pts: 200 },
     witness_20:       { name: '👁 命运见证者', desc: '累计记录20次预言结果',   pts: 100 },
     scholar:          { name: '📚 命运学者', desc: '浏览全部78张牌库',         pts: 30 },
-    cartographer:     { name: '🗺 星图编辑者', desc: '反馈被采纳',             pts: 150 }
+    cartographer:     { name: '🗺 星图编辑者', desc: '反馈被采纳',             pts: 0 }
   };
 
   function unlock(id) {
@@ -20,7 +20,9 @@
     const a = ACHIEVEMENTS[id];
     if (!a) return false;
     window.VELA.achievements[id] = { ts: Date.now() };
-    addPoints(a.pts, `成就：${a.name}`);
+    if (a.pts > 0 && !window.VELA_CLOUD?.isSignedIn?.()) {
+      addPoints(a.pts, `成就：${a.name}`, null, `achievement_${id}`, id);
+    }
     showAchievementToast(a);
     window.VELA.save();
     return true;
@@ -35,6 +37,7 @@
     const rebellions = v.history.filter(h => h.outcome === 'rebellion').length;
     if (rebellions >= 3) unlock('rebellion_3');
     if (v.viewedCards.length >= 78) unlock('scholar');
+    if (storage.get('vela_feedback_approved', false)) unlock('cartographer');
   }
 
   function showAchievementToast(a) {
@@ -48,21 +51,49 @@
         <div class="name">${a.name}</div>
         <div class="desc">${a.desc}</div>
       </div>
-      <div class="pts">+${a.pts}</div>
+      ${a.pts > 0 ? `<div class="pts">+${a.pts}</div>` : ''}
     `;
     stack.appendChild(el);
     setTimeout(() => el.classList.add('out'), 3500);
     setTimeout(() => el.remove(), 3900);
   }
 
-  function addPoints(n, reason, fromXY = null) {
+  function addPoints(n, reason, fromXY = null, cloudAction = null, eventId = null) {
     if (n <= 0) return;
+    if (window.VELA_CLOUD?.isSignedIn?.()) {
+      const action = cloudAction || inferCloudAction(n, reason);
+      if (!action) {
+        console.warn('Cloud points action not recognized:', reason);
+        return;
+      }
+      window.VELA_CLOUD.awardPoints(action, eventId || `${action}_${Date.now()}`)
+        .then(r => {
+          if (!r || r.duplicate) return;
+          window.VELA.pointsLog.unshift({ n: r.awarded || n, reason, ts: Date.now() });
+          window.VELA.pointsLog = window.VELA.pointsLog.slice(0, 50);
+          floatPoints(r.awarded || n, fromXY);
+          window.VELA.save();
+        })
+        .catch(e => window.VELA_GESTURES?.showTopToast?.(e.message || '积分同步失败'));
+      return;
+    }
     window.VELA.points += n;
     window.VELA.pointsLog.unshift({ n, reason, ts: Date.now() });
     window.VELA.pointsLog = window.VELA.pointsLog.slice(0, 50);
     updatePointsDisplay();
     floatPoints(n, fromXY);
     window.VELA.save();
+  }
+
+  function inferCloudAction(n, reason) {
+    if (reason === '每日签到') return 'daily_checkin';
+    if (reason === '完成每日一牌') return 'reading_daily';
+    if (reason === '完成解读') return 'reading';
+    if (reason === '分享解读') return 'share';
+    if (reason === '提交反馈') return 'feedback';
+    if (reason === '记录预言结果') return n >= 55 ? 'outcome_high' : 'outcome_standard';
+    if (reason === '连续30天奖励') return 'streak_30';
+    return null;
   }
 
   function updatePointsDisplay() {
@@ -87,7 +118,10 @@
     return storage.get('vela_checkin_day') === dayKey();
   }
   function getStreak() {
-    return storage.get('vela_streak', 0);
+    const last = storage.get('vela_checkin_day');
+    const today = dayKey();
+    const yesterday = dayKey(new Date(Date.now() - 86400000));
+    return (last === today || last === yesterday) ? storage.get('vela_streak', 0) : 0;
   }
   function maybeShowCheckin() {
     const banner = document.getElementById('checkin-banner');
@@ -107,11 +141,13 @@
     storage.set('vela_streak', streak);
 
     const xy = evt ? { x: evt.clientX, y: evt.clientY } : null;
-    addPoints(10, '每日签到', xy);
+    addPoints(10, '每日签到', xy, 'daily_checkin', today);
     document.getElementById('checkin-banner')?.classList.remove('visible');
 
-    if (streak === 7) unlock('streak_7');
-    if (streak === 30) addPoints(200, '连续30天奖励');
+    if (streak >= 7) unlock('streak_7');
+    if (streak === 30 && !window.VELA_CLOUD?.isSignedIn?.()) {
+      addPoints(200, '连续30天奖励', null, 'streak_30', today);
+    }
   }
 
   // public expose
