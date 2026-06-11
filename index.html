@@ -2,12 +2,12 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>VELA · 塔罗占卜</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=Cinzel:wght@400;600&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500;1,600&family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&family=DM+Sans:wght@400;500;600&family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/vela.css?v=20260526-3">
+<link rel="stylesheet" href="assets/css/vela.css">
 </head>
 <body data-theme="A">
 
@@ -54,6 +54,7 @@
     <div class="topbar-brand" id="topbar-brand">VELA</div>
     <div class="topbar-actions">
       <button class="topbar-btn points" id="btn-points"><span class="icon">✦</span><span id="points-display">0</span></button>
+      <button class="topbar-btn" id="btn-account"><span class="icon">◉</span><span id="account-label">登录</span></button>
       <button class="topbar-btn" id="btn-log"><span class="icon">📖</span><span>日志</span></button>
       <button class="topbar-btn" id="btn-settings"><span class="icon">⚙</span><span>设置</span></button>
     </div>
@@ -103,7 +104,7 @@
         <span class="label">张开手掌 · 悬停选牌</span>
       </div>
     </div>
-    <p>握拳 0.8 秒开始占卜，<br/>张开手掌在中间悬停以选中卡牌，<br/>把手移到画面左右两侧可滚动牌阵。</p>
+    <p>握拳蓄力开始占卜；张开手掌左右移动可浏览牌阵；<br/>在中央悬停，或用拇指与食指捏合，可以召唤选中的牌；<br/>翻牌后伸出双指成 V，开启星辰解读。</p>
     <button class="btn-primary" id="onboard-ok">知道了 →</button>
   </div>
 </div>
@@ -114,6 +115,8 @@
 <div class="modal-backdrop" id="card-detail-modal"><div class="modal-card"></div></div>
 <div class="modal-backdrop" id="deck-modal"><div class="modal-card large"></div></div>
 <div class="modal-backdrop" id="log-modal"><div class="modal-card large"></div></div>
+<div class="modal-backdrop auth-required" id="auth-modal"><div class="modal-card"></div></div>
+<div class="modal-backdrop" id="admin-modal"><div class="modal-card large"></div></div>
 
 <!-- Settings as side panel -->
 <aside class="panel" id="settings-panel"></aside>
@@ -143,11 +146,11 @@
     <text x="184" y="148" fill="#80755a" font-family="DM Sans" font-size="6">μ</text>
   </svg>
   <div class="letter">
-    <p>VELA 是南天星座「船帆座」的拉丁语名。</p>
-    <p>大航海时代，水手们靠星辰导航，<br/>在茫茫大海中寻找方向。</p>
-    <p>我们希望 VELA 做同样的事 ——<br/>不是替你决定命运，<br/>而是在你迷雾最深的时候，帮你看清自己。</p>
-    <p>塔罗的 78 张牌，是 78 面镜子。<br/>VELA 不是一个算命的地方。</p>
-    <p class="signoff">—— 来自 VELA 的初心</p>
+    <p>VELA，是南方夜空里的一面船帆。</p>
+    <p>很久以前，远航的人仰望星辰，<br/>不是向星星询问终点，<br/>只是借一点微光，认出自己正在前往的方向。</p>
+    <p>我们也愿成为这样的微光。<br/>不替你书写命运，不催你抵达答案，<br/>只在雾起的时候，陪你安静地看一会儿海。</p>
+    <p>七十八张牌，是七十八扇窗。<br/>你从牌里看见的，始终是心中早已存在的风景。</p>
+    <p class="signoff">愿你升起自己的帆，循着自己的星光。</p>
   </div>
   <button id="vela-egg-close">[ 关闭 ]</button>
 </div>
@@ -163,14 +166,20 @@
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 
 <!-- ============== APP SCRIPTS ============== -->
-<script src="assets/js/vela-utils.js?v=20260526-3"></script>
-<script src="assets/js/vela-data.js?v=20260526-3"></script>
-<script src="assets/js/vela-themes.js?v=20260526-3"></script>
-<script src="assets/js/vela-carousel.js?v=20260526-3"></script>
-<script src="assets/js/vela-gestures.js?v=20260526-3"></script>
-<script src="assets/js/vela-points.js?v=20260526-3"></script>
-<script src="assets/js/vela-modals.js?v=20260526-3"></script>
-<script src="assets/js/vela-app.js?v=20260526-3"></script>
+<script src="https://www.gstatic.com/firebasejs/11.10.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.10.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.10.0/firebase-functions-compat.js"></script>
+<script src="assets/js/vela-utils.js"></script>
+<script src="assets/js/firebase-config.js"></script>
+<script src="assets/js/vela-cloud.js"></script>
+<script src="assets/js/vela-data.js"></script>
+<script src="assets/js/vela-themes.js"></script>
+<script src="assets/js/vela-carousel.js"></script>
+<script src="assets/js/vela-gestures.js"></script>
+<script src="assets/js/vela-points.js"></script>
+<script src="assets/js/vela-modals.js"></script>
+<script src="assets/js/vela-app.js"></script>
 
 </body>
 </html>
