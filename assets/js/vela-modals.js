@@ -138,7 +138,7 @@
       const t = sw.dataset.t;
       if (!window.VELA.unlocked.themes.includes(t)) {
         const need = { C: 100, D: 200 }[t] || 0;
-        if (window.VELA_CLOUD?.isSignedIn?.()) {
+      if (window.VELA_CLOUD?.isSignedIn?.()) {
           try {
             await window.VELA_CLOUD.purchaseSkin('themes', t);
             window.VELA_THEMES.applyTheme(t);
@@ -949,6 +949,7 @@
 
   // ===== Store / Feedback / Redeem =====
   function openStore(tab = 'faces') {
+    window.VELA_UTIL?.normalizeVelaState?.();
     const m = document.getElementById('card-detail-modal');
     const isFaces = tab === 'faces';
     const skins = isFaces ? FACE_SKINS : BACK_SKINS;
@@ -969,6 +970,7 @@
         <button class="skin-tab ${!isFaces ? 'active' : ''}" data-store-tab="backs">牌背皮肤</button>
       </div>
       ${isFaces ? '<div style="font-family:var(--font-ui);font-size:11px;color:var(--text-dim);margin-bottom:12px;">未完成的牌会自动使用经典牌补位，不会影响抽牌、逆位或解读。</div>' : ''}
+      ${window.VELA_UTIL?.isLocalPreview?.() && !window.VELA_UTIL?.isTestAccessEnabled?.() ? '<button class="topbar-btn" id="store-test-unlock" style="width:100%;justify-content:center;margin-bottom:12px;">本地测试：解锁全部皮肤与积分</button>' : ''}
       <div class="skin-grid">
         ${Object.entries(skins).map(([id, s]) => {
           const isOwned = owned.includes(id);
@@ -992,6 +994,11 @@
       </div>
     `;
     m.querySelector('[data-close]').onclick = () => m.classList.remove('visible');
+    m.querySelector('#store-test-unlock')?.addEventListener('click', async () => {
+      window.VELA_UTIL?.enableTestAccess?.();
+      if (window.VELA.prefs.gestureControl) await window.VELA_GESTURES?.setGestureEnabled?.(true);
+      openStore(tab);
+    });
     m.querySelectorAll('[data-store-tab]').forEach(b => b.onclick = () => openStore(b.dataset.storeTab));
     m.querySelectorAll('[data-buy]').forEach(b => b.onclick = async () => {
       const pts = parseInt(b.dataset.pts);
@@ -1022,8 +1029,10 @@
       } else {
         window.VELA.cardBack = b.dataset.use;
         document.body.setAttribute('data-cardback', b.dataset.use);
+        window.VELA_CAROUSEL?.applyCardBackSkin?.(document);
       }
       window.VELA.save();
+      window.VELA_CAROUSEL?.refreshCardImages?.(document);
       window.VELA_GESTURES.showTopToast(`已切换${isFaces ? '牌面' : '牌背'}：${skins[b.dataset.use].name}`);
       openStore(tab);
     });
@@ -1124,6 +1133,22 @@
     m.querySelector('#rd-ok').onclick = async (e) => {
       const code = (m.querySelector('#rd-code').value || '').trim().toUpperCase();
       if (!code) return;
+      const localCodes = { 'VELA-WELCOME': 100, 'VELA-STARS': 50, 'VELA-TEST-10000': 10000, 'VELA-DEV': 10000, 'VELA-SKIN': 10000, 'VELA-LOCAL': 10000, 'VELA-DEBUG': 10000, 'VELA-FULL': 50000 };
+      const forceLocalTest = !!localCodes[code] && window.VELA_UTIL?.isLocalPreview?.();
+      if (forceLocalTest) {
+        const award = localCodes[code];
+        window.VELA.points = (Number(window.VELA.points) || 0) + award;
+        window.VELA.pointsLog = Array.isArray(window.VELA.pointsLog) ? window.VELA.pointsLog : [];
+        window.VELA.pointsLog.unshift({ n: award, reason: '兑换码 ' + code, ts: Date.now() });
+        window.VELA.pointsLog = window.VELA.pointsLog.slice(0, 50);
+        if (!Array.isArray(window.VELA.usedCodes)) window.VELA.usedCodes = [];
+        if (!window.VELA.usedCodes.includes(code)) window.VELA.usedCodes.push(code);
+        window.VELA_POINTS.updatePointsDisplay();
+        window.VELA.save();
+        window.VELA_GESTURES.showTopToast(`兑换成功 +${award} 积分`);
+        m.classList.remove('visible');
+        return;
+      }
       if (window.VELA_CLOUD?.isSignedIn?.()) {
         try {
           const result = await window.VELA_CLOUD.redeemCode(code);
@@ -1135,7 +1160,7 @@
         return;
       }
       // demo: only one valid code: VELA-WELCOME → 100 pts
-      const CODES = { 'VELA-WELCOME': 100, 'VELA-STARS': 50 };
+      const CODES = localCodes;
       if (window.VELA.usedCodes.includes(code)) {
         window.VELA_GESTURES.showTopToast('此兑换码已使用过');
         return;

@@ -13,6 +13,8 @@
   const CHARGE_MS = 800;
   let videoEl, mpHands, mpCamera;
   let camActive = false;
+  let cameraLoopRunning = false;
+  let cameraFrameBusy = false;
   let lastLandmarks = null;
   let lastLandmarksTime = 0;
   let chargeStart = 0;
@@ -27,13 +29,64 @@
     return [8,12,16,20].reduce((s,i) =>
       s + Math.hypot(lm[i].x-lm[0].x, lm[i].y-lm[0].y), 0) / 4;
   }
-  const isFist = lm => avgDist(lm) < 0.23;
+  const isFist = lm => avgDist(lm) < 0.28;
   const isPalm = lm => avgDist(lm) > 0.40;
   const isPinch = lm => Math.hypot(lm[4].x-lm[8].x, lm[4].y-lm[8].y) < 0.055;
   const fingerUp = (lm, tip, pip) => lm[tip].y < lm[pip].y - 0.025;
   const isVictory = lm => fingerUp(lm, 8, 6) && fingerUp(lm, 12, 10) &&
     !fingerUp(lm, 16, 14) && !fingerUp(lm, 20, 18);
 
+  function loadScript(src) {
+    if ([...document.scripts].some(script => script.src === src)) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = src;
+      script.crossOrigin = 'anonymous';
+      script.onload = resolve;
+      script.onerror = () => reject(new Error(`Failed to load ${src}`));
+      document.head.appendChild(script);
+    });
+  }
+
+  async function ensureHandsLoaded() {
+    if (!window.Hands) {
+      await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js');
+    }
+    if (!window.Hands) return false;
+    if (!window.Camera) {
+      await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js').catch(() => {});
+    }
+    return true;
+  }
+
+  async function sendFrame() {
+    if (!mpHands || !videoEl || window.VELA.isPaused || cameraFrameBusy) return;
+    if (videoEl.readyState < 2) return;
+    cameraFrameBusy = true;
+    try {
+      await mpHands.send({ image: videoEl });
+    } finally {
+      cameraFrameBusy = false;
+    }
+  }
+
+  async function startManualCameraLoop() {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: 640, height: 480 },
+      audio: false
+    });
+    videoEl.srcObject = stream;
+    videoEl.playsInline = true;
+    videoEl.muted = true;
+    await videoEl.play();
+    cameraLoopRunning = true;
+    const loop = async () => {
+      if (!cameraLoopRunning) return;
+      await sendFrame().catch(e => console.warn('Hand frame failed:', e));
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+  }
   function showTopToast(text) {
     let t = document.querySelector('.top-toast');
     if (!t) {
@@ -247,9 +300,10 @@
         setStatus('张开手掌选牌');
       }
     } else if (window.VELA.state === 'IDLE' || window.VELA.state === 'INTERPRETING') {
-      // Fist begins a reading; a V sign opens interpretation after cards are revealed.
-      const ritual = window.VELA.state === 'INTERPRETING' ? victory : fist;
-      const ritualMode = window.VELA.state === 'INTERPRETING' ? 'victory' : 'fist';
+      // Fist begins a reading and also opens interpretation after cards are revealed; V remains supported.
+      const isInterpreting = window.VELA.state === 'INTERPRETING';
+      const ritual = isInterpreting ? (fist || victory) : fist;
+      const ritualMode = isInterpreting ? (fist ? 'fist-interpret' : 'victory') : 'fist';
       if (ritual) {
         if (!chargeStart || chargeMode !== ritualMode) {
           chargeStart = performance.now();
@@ -257,11 +311,11 @@
         }
         const p = Math.min(1, (performance.now() - chargeStart) / CHARGE_MS);
         setRingProgress(p);
-        setStatus(window.VELA.state === 'INTERPRETING' ? '双指成印 · 开启星辰解读' : '握拳蓄力 · 开启占卜');
+        setStatus(isInterpreting ? '握拳蓄力 · 开启星辰解读' : '握拳蓄力 · 开启占卜');
         if (p >= 1) {
           chargeStart = 0; chargeMode = null;
           setRingProgress(0);
-          castSpell(x, y, window.VELA.state === 'INTERPRETING' ? 'V' : '✦');
+          castSpell(x, y, isInterpreting ? 'V' : '✦');
           onChargeComplete?.();
         }
       } else {
@@ -280,17 +334,30 @@
 
   async function startCamera() {
     if (camActive) return true;
+    if (!navigator.mediaDevices?.getUserMedia) {
+      showTopToast('当前浏览器不支持摄像头手势，请使用触摸/鼠标/键盘');
+      return false;
+    }
+    if (!window.isSecureContext) {
+      showTopToast('摄像头手势需要 HTTPS 或 localhost 本地预览');
+      return false;
+    }
+
     videoEl?.remove();
     videoEl = document.createElement('video');
     videoEl.style.display = 'none';
+    videoEl.playsInline = true;
+    videoEl.muted = true;
     document.body.appendChild(videoEl);
 
-    if (typeof Hands === 'undefined') {
-      showTopToast('摄像头/手势库未加载，已切换为触摸/键盘 ✨');
-      return false;
-    }
     try {
-      mpHands = new Hands({
+      const loaded = await ensureHandsLoaded();
+      if (!loaded) {
+        showTopToast('手势库未加载，已切换为触摸/键盘');
+        return false;
+      }
+
+      mpHands = new window.Hands({
         locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
       });
       mpHands.setOptions({
@@ -298,15 +365,24 @@
         minDetectionConfidence: 0.6, minTrackingConfidence: 0.5
       });
       mpHands.onResults(processHands);
-      mpCamera = new Camera(videoEl, {
-        onFrame: async () => {
-          if (!window.VELA.isPaused) await mpHands.send({ image: videoEl });
-        },
-        width: 640, height: 480
-      });
-      await mpCamera.start();
+
+      try {
+        if (window.Camera) {
+          mpCamera = new window.Camera(videoEl, {
+            onFrame: sendFrame,
+            width: 640,
+            height: 480
+          });
+          await mpCamera.start();
+        } else {
+          await startManualCameraLoop();
+        }
+      } catch (cameraError) {
+        console.warn('MediaPipe Camera failed, retrying with manual loop:', cameraError);
+        await startManualCameraLoop();
+      }
+
       camActive = true;
-      // preview if enabled
       const prev = document.getElementById('cam-preview');
       if (prev) {
         prev.querySelector('video')?.remove();
@@ -319,7 +395,11 @@
       return true;
     } catch (e) {
       console.warn('Camera failed:', e);
-      showTopToast('摄像头暂时不可用，已切换为触摸/点击模式 ✨');
+      cameraLoopRunning = false;
+      try { videoEl?.srcObject?.getTracks?.().forEach(t => t.stop()); } catch {}
+      videoEl?.remove();
+      videoEl = null;
+      showTopToast('摄像头暂时不可用，请检查权限或网络后重试');
       camActive = false;
       return false;
     }
@@ -339,6 +419,7 @@
       if (ok) showTopToast('手势控制已开启');
       return ok;
     }
+    cameraLoopRunning = false;
     try { mpCamera?.stop?.(); } catch {}
     try { videoEl?.srcObject?.getTracks?.().forEach(t => t.stop()); } catch {}
     camActive = false;

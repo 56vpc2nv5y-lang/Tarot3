@@ -328,7 +328,7 @@
 
     await preloadAssets();
     renderIdle();
-    const authReady = !window.VELA_CLOUD?.enabled || window.VELA_CLOUD?.isSignedIn?.();
+    const authReady = !window.VELA_CLOUD?.enabled || window.VELA_CLOUD?.isSignedIn?.() || window.VELA_UTIL?.isTestAccessEnabled?.();
     if (window.VELA.prefs.gestureControl && authReady) G.showOnboarding();
 
     // Start camera in background (don't block UI)

@@ -47,15 +47,51 @@
     </svg>`;
   }
 
+  const PHOTO_CARD_BACKS = Object.freeze({
+    cat: 'cat/cat_card_back.png',
+    divine: 'chinese god and godness/chinese_divine_card_back.png',
+    botanical: 'tree/botanical_codex_card_back.png'
+  });
+
+  function applyBackSkinToElement(back, skin = window.VELA?.cardBack || 'classic') {
+    if (!back) return;
+    const currentSkin = skin || 'classic';
+    back.dataset.cardback = currentSkin;
+    const src = PHOTO_CARD_BACKS[currentSkin];
+    const inner = back.querySelector('.card-back-inner');
+    if (src) {
+      back.style.background = `url("${src}") center / cover no-repeat`;
+      back.style.backgroundSize = 'cover';
+      back.style.backgroundPosition = 'center';
+      back.style.backgroundRepeat = 'no-repeat';
+      if (inner) inner.style.display = 'none';
+      return;
+    }
+    back.style.removeProperty('background');
+    back.style.removeProperty('background-image');
+    back.style.removeProperty('background-size');
+    back.style.removeProperty('background-position');
+    back.style.removeProperty('background-repeat');
+    if (inner) inner.style.removeProperty('display');
+  }
+
+  function applyCardBackSkin(root = document) {
+    const skin = window.VELA?.cardBack || 'classic';
+    if (document.body) document.body.dataset.cardback = skin;
+    if (root.matches?.('.card-back')) applyBackSkinToElement(root, skin);
+    root.querySelectorAll?.('.card-back').forEach(back => applyBackSkinToElement(back, skin));
+  }
+
   function makeCardEl(card, opts = {}) {
-    const shell = el('div', { class: 'card-shell' + (opts.reversed ? ' reversed' : '') });
+    const shell = el('div', { class: 'card-shell' + (opts.reversed ? ' reversed' : ''), 'data-card-id': card?.id || '' });
     const back = el('div', { class: 'card-face back' },
       el('div', { class: 'card-back' },
         el('div', { class: 'card-back-inner', html: backSVG() })
       )
     );
+    applyBackSkinToElement(back.querySelector('.card-back'));
     const front = el('div', { class: 'card-face front' });
-    const img = el('img', { class: 'card-front-img', src: getCardImage(card), alt: card.n });
+    const img = el('img', { class: 'card-front-img', src: getCardImage(card), alt: card.n, 'data-card-id': card.id });
     img.onerror = () => {
       const fb = el('div', { class: 'card-front-fallback' },
         el('div', {}, CN_NAMES[card.id] || card.n),
@@ -248,8 +284,8 @@
   function addToSlot(card, rev, pos, idx) {
     const slots = document.getElementById('slots');
     if (!slots) return;
-    const s = el('div', { class: 'slot filled slot-anim' });
-    const img = el('img', { src: getCardImage(card), alt: card.n });
+    const s = el('div', { class: 'slot filled slot-anim', 'data-card-id': card.id });
+    const img = el('img', { src: getCardImage(card), alt: card.n, 'data-card-id': card.id });
     img.onerror = () => {
       const fb = el('div', { class: 'card-front-fallback', style: { fontSize: '10px' } }, CN_NAMES[card.id] || card.n);
       s.innerHTML = ''; s.appendChild(fb); s.appendChild(el('div', { class: 'pos-tag' }, pos));
@@ -306,8 +342,30 @@
     }
   }
 
+  function refreshCardImages(root = document) {
+    applyCardBackSkin(root);
+    root.querySelectorAll?.('[data-card-id]').forEach(node => {
+      const id = node.dataset?.cardId;
+      if (!id) return;
+      const card = DECK.find(c => c.id === id);
+      if (!card) return;
+      const img = node.matches?.('img') ? node : node.querySelector?.('img.card-front-img, img');
+      if (!img) return;
+      const next = getCardImage(card);
+      if (next && img.getAttribute('src') !== next) img.setAttribute('src', next);
+      img.alt = card.n;
+
+      const host = node.matches?.('.card-shell') ? node : node.closest?.('.card-shell');
+      const front = host?.querySelector?.('.card-face.front');
+      if (!front) return;
+      front.querySelectorAll('.classic-fallback-marker').forEach(marker => marker.remove());
+      if (!hasCustomCardImage(card) && window.VELA.cardFace !== 'classic') {
+        front.appendChild(el('div', { class: 'classic-fallback-marker', title: '此牌面尚未完成，暂用经典牌' }, '经典补位'));
+      }
+    });
+  }
   window.VELA_CAROUSEL = {
     initCarousel, scrollBy, setLockedIndex, getCenterIndex, selectCenter,
-    initSlots, clearSlots, showReveal, onComplete, makeCardEl
+    initSlots, clearSlots, showReveal, onComplete, makeCardEl, refreshCardImages, applyCardBackSkin
   };
 })();

@@ -76,6 +76,11 @@ const DIVINE_AVAILABLE = new Set([
   'waac','wa02','wa03'
 ]);
 const BOTANIC_AVAILABLE = new Set(Array.from({ length: 15 }, (_, i) => `ar${String(i).padStart(2, '0')}`));
+// Goddess deck: 21 of 22 majors (missing IX The Hermit / ar09) + Page of Wands.
+const GODDESS_AVAILABLE = new Set([
+  ...Array.from({ length: 22 }, (_, i) => `ar${String(i).padStart(2, '0')}`).filter(id => id !== 'ar09'),
+  'wapa'
+]);
 
 const FACE_SKINS = {
   classic: {
@@ -93,6 +98,10 @@ const FACE_SKINS = {
   botanical: {
     name: '植物图鉴', icon: '🌿', price: 360, coverage: BOTANIC_AVAILABLE.size,
     desc: '植物学图谱 · 缺图自动使用经典牌', cover: 'tree/botanic_major_10_wheel_of_fortune_sunflower.png'
+  },
+  goddess: {
+    name: '女神低语', icon: '🌸', price: 480, coverage: GODDESS_AVAILABLE.size,
+    desc: '唯美女神大牌 · 缺图自动使用经典牌', cover: 'goddness/goddess_major_00_fool.png'
   }
 };
 
@@ -126,6 +135,15 @@ function customCardImage(card, skin) {
   if (skin === 'botanical' && BOTANIC_AVAILABLE.has(card.id)) {
     const i = Number(card.id.slice(2));
     return `tree/botanic_major_${String(i).padStart(2, '0')}_${BOTANIC_MAJOR[i]}.png`;
+  }
+  if (skin === 'goddess' && GODDESS_AVAILABLE.has(card.id)) {
+    if (card.id.startsWith('ar')) {
+      const i = Number(card.id.slice(2));
+      return `goddness/goddess_major_${String(i).padStart(2, '0')}_${CAT_MAJOR[i]}.png`;
+    }
+    const suit = SUIT_FILE[card.id.slice(0, 2)];
+    const rank = RANK_FILE[card.id.slice(2)];
+    return `goddness/goddess_${suit}_${rank}.png`;
   }
   return null;
 }

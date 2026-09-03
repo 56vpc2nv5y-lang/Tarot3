@@ -50,14 +50,20 @@
       }
       document.getElementById('auth-modal')?.classList.remove('visible');
     } else {
-      openAuth(true);
+      cloud.isAdmin = false;
+      if (window.VELA_UTIL?.isTestAccessEnabled?.()) {
+        window.VELA_UTIL.enableTestAccess({ persist: false, silent: true });
+        document.getElementById('auth-modal')?.classList.remove('visible');
+      } else {
+        openAuth(true);
+      }
     }
     updateAccountLabel();
   }
 
   function updateAccountLabel() {
     const label = document.getElementById('account-label');
-    if (label) label.textContent = admin ? '管理后台' : (user?.email || '登录');
+    if (label) label.textContent = admin ? '管理后台' : (user?.email || (window.VELA_UTIL?.isTestAccessEnabled?.() ? '本地测试' : '登录'));
   }
 
   function friendlyError(e) {
@@ -71,7 +77,12 @@
   }
 
   function openAuth(required = false) {
+    if (window.VELA_UTIL?.isTestAccessEnabled?.() && !user) return renderLocalTestAccount();
     if (!enabled) {
+      if (window.VELA_UTIL?.isLocalPreview?.()) {
+        window.VELA_UTIL.enableTestAccess();
+        return renderLocalTestAccount();
+      }
       window.VELA_GESTURES?.showTopToast?.('Firebase 尚未配置，当前使用本地模式');
       return;
     }
@@ -133,6 +144,7 @@
         <div class="field"><label>密码</label><input id="auth-password" type="password" autocomplete="${tab === 'register' ? 'new-password' : 'current-password'}" placeholder="至少 6 位"></div>
         <button class="btn-primary" id="auth-submit" style="width:100%;">${tab === 'register' ? '创建账号' : '登录'}</button>
         ${tab === 'login' ? '<button class="topbar-btn" id="auth-reset" style="width:100%;justify-content:center;margin-top:8px;">忘记密码</button>' : ''}
+        ${tab === 'login' && window.VELA_UTIL?.isLocalPreview?.() ? '<button class="topbar-btn" id="auth-local-test" style="width:100%;justify-content:center;margin-top:8px;">本地测试模式：解锁全部皮肤</button>' : ''}
       `;
       body.querySelector('#auth-submit').onclick = async () => {
         const email = body.querySelector('#auth-email').value.trim();
@@ -154,6 +166,12 @@
           }
         } catch (e) { err.textContent = friendlyError(e); }
       };
+      body.querySelector('#auth-local-test')?.addEventListener('click', async () => {
+        window.VELA_UTIL?.enableTestAccess?.();
+        m.classList.remove('visible');
+        updateAccountLabel();
+        if (window.VELA.prefs.gestureControl) await window.VELA_GESTURES?.setGestureEnabled?.(true);
+      });
       body.querySelector('#auth-reset')?.addEventListener('click', async () => {
         const email = body.querySelector('#auth-email').value.trim();
         if (!email) { err.textContent = '请先输入邮箱'; return; }
@@ -166,6 +184,27 @@
     }
   }
 
+  function renderLocalTestAccount() {
+    const m = document.getElementById('auth-modal');
+    const card = m.querySelector('.modal-card');
+    card.innerHTML = `
+      <button class="modal-close" data-close>×</button>
+      <h2>本地测试模式</h2>
+      <div class="modal-sub">已解锁全部主题、牌面、牌背，并提供足够积分用于测试。</div>
+      <button class="btn-primary" data-open-store style="width:100%;margin-bottom:10px;">打开皮肤商店</button>
+      <button class="topbar-btn" data-disable-test style="width:100%;justify-content:center;">关闭测试模式并刷新</button>
+    `;
+    card.querySelector('[data-close]').onclick = () => m.classList.remove('visible');
+    card.querySelector('[data-open-store]').onclick = () => {
+      m.classList.remove('visible');
+      window.VELA_MODALS?.openStore?.('faces');
+    };
+    card.querySelector('[data-disable-test]').onclick = () => {
+      window.VELA_UTIL?.storage?.remove?.('vela_test_access');
+      location.reload();
+    };
+    m.classList.add('visible');
+  }
   function renderAccount() {
     const m = document.getElementById('auth-modal');
     m.querySelector('.modal-card').innerHTML = `
@@ -218,6 +257,9 @@
       const localApiKey = window.VELA.prefs?.apiKey || '';
       ['history','achievements','viewedCards','currentSpread','currentTheme','currentTone','cardBack','cardFace']
         .forEach(k => { if (state[k] !== undefined) window.VELA[k] = state[k]; });
+      window.VELA_UTIL?.normalizeVelaState?.();
+      window.VELA_UTIL?.ensurePreviewPoints?.();
+      if (window.VELA_UTIL?.isTestAccessEnabled?.()) window.VELA_UTIL.enableTestAccess({ persist: false, silent: true });
       if (state.prefs) window.VELA.prefs = { ...window.VELA.prefs, ...state.prefs, apiKey: localApiKey };
       if (Array.isArray(profile.achievementIds)) {
         profile.achievementIds.forEach(id => {
@@ -241,6 +283,9 @@
       try {
         if (typeof profile.points === 'number') window.VELA.points = profile.points;
         if (profile.unlocked) window.VELA.unlocked = profile.unlocked;
+        window.VELA_UTIL?.normalizeVelaState?.();
+        window.VELA_UTIL?.ensurePreviewPoints?.();
+        if (window.VELA_UTIL?.isTestAccessEnabled?.()) window.VELA_UTIL.enableTestAccess({ persist: false, silent: true });
         if (Array.isArray(profile.achievementIds)) {
           profile.achievementIds.forEach(id => {
             window.VELA.achievements[id] ||= { ts: Date.now(), cloud: true };
@@ -303,6 +348,9 @@
   function applyServerWallet(result) {
     window.VELA.points = result.points;
     if (result.unlocked) window.VELA.unlocked = result.unlocked;
+    window.VELA_UTIL?.normalizeVelaState?.();
+    window.VELA_UTIL?.ensurePreviewPoints?.();
+    if (window.VELA_UTIL?.isTestAccessEnabled?.()) window.VELA_UTIL.enableTestAccess({ persist: false, silent: true });
     window.VELA_POINTS?.updatePointsDisplay?.();
     window.VELA.save();
   }

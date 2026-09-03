@@ -48,6 +48,77 @@ const fmtTime = ts => {
 
 const dayKey = (date=new Date()) => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
 
+const DEFAULT_UNLOCKED = {
+  themes: ['A', 'B'],
+  backs: ['classic'],
+  faces: ['classic']
+};
+
+const TEST_UNLOCKED = {
+  themes: ['A', 'B', 'C', 'D'],
+  backs: ['classic', 'cat', 'divine', 'botanical'],
+  faces: ['classic', 'cat', 'divine', 'botanical', 'goddess']
+};
+
+const DEFAULT_LOCAL_POINTS = 10000;
+
+function uniqueList(value, fallback) {
+  const source = Array.isArray(value) ? value : [];
+  return Array.from(new Set([...fallback, ...source].filter(Boolean)));
+}
+
+function normalizeUnlocked(value, unlockAll = false) {
+  const raw = value && typeof value === 'object' ? value : {};
+  const base = unlockAll ? TEST_UNLOCKED : DEFAULT_UNLOCKED;
+  return {
+    themes: uniqueList(raw.themes, base.themes),
+    backs: uniqueList(raw.backs, base.backs),
+    faces: uniqueList(raw.faces, base.faces)
+  };
+}
+
+function isLocalPreview() {
+  return ['localhost', '127.0.0.1', '::1'].includes(location.hostname) || location.protocol === 'file:';
+}
+
+function isTestAccessEnabled() {
+  return storage.get('vela_test_access', false) === true;
+}
+
+function normalizeVelaState() {
+  if (!window.VELA) return;
+  const testAccess = isTestAccessEnabled();
+  window.VELA.unlocked = normalizeUnlocked(window.VELA.unlocked, testAccess);
+  const faces = window.VELA.unlocked.faces;
+  const backs = window.VELA.unlocked.backs;
+  if (!faces.includes(window.VELA.cardFace)) window.VELA.cardFace = 'classic';
+  if (!backs.includes(window.VELA.cardBack)) window.VELA.cardBack = 'classic';
+}
+
+function ensurePreviewPoints(min = DEFAULT_LOCAL_POINTS) {
+  if (!window.VELA || !isLocalPreview()) return;
+  const current = Number(window.VELA.points) || 0;
+  if (current >= min) return;
+  window.VELA.points = min;
+  storage.set('vela_points', window.VELA.points);
+  window.VELA_POINTS?.updatePointsDisplay?.();
+}
+
+function enableTestAccess({ persist = true, silent = false } = {}) {
+  if (!window.VELA) return;
+  storage.set('vela_test_access', true);
+  window.VELA.unlocked = normalizeUnlocked(window.VELA.unlocked, true);
+  window.VELA.points = Math.max(Number(window.VELA.points) || 0, 99999);
+  if (persist) window.VELA.save();
+  else {
+    storage.set('vela_points', window.VELA.points);
+    storage.set('vela_unlocked', window.VELA.unlocked);
+  }
+  window.VELA_POINTS?.updatePointsDisplay?.();
+  document.body?.classList.add('vela-test-access');
+  if (!silent) window.VELA_GESTURES?.showTopToast?.('测试模式已开启：全部皮肤和积分已解锁');
+}
+
 // Global state container (mutable singleton)
 window.VELA = {
   // app state
@@ -67,12 +138,12 @@ window.VELA = {
   carouselVel: 0,
 
   // user data
-  points: storage.get('vela_points', 0),
+  points: Math.max(Number(storage.get('vela_points', DEFAULT_LOCAL_POINTS)) || 0, DEFAULT_LOCAL_POINTS),
   pointsLog: storage.get('vela_points_log', []),
   history: storage.get('vela_history', []),
   achievements: storage.get('vela_achievements', {}),
   viewedCards: storage.get('vela_viewed_cards', []),
-  unlocked: storage.get('vela_unlocked', { themes: ['A','B'], backs: ['classic'], faces: ['classic'] }),
+  unlocked: storage.get('vela_unlocked', DEFAULT_UNLOCKED),
   usedCodes: storage.get('vela_used_codes', []),
 
   // settings
@@ -107,16 +178,20 @@ window.VELA = {
   }
 };
 
-// Migrate older local saves that predate face skins.
-window.VELA.unlocked.themes ||= ['A', 'B'];
-window.VELA.unlocked.backs ||= ['classic'];
-window.VELA.unlocked.faces ||= ['classic'];
+// Migrate older local/cloud saves that predate face and back skins.
+normalizeVelaState();
+ensurePreviewPoints();
 window.VELA.prefs.gestureControl ??= !window.matchMedia('(pointer: coarse)').matches;
 window.VELA.prefs.cameraPreview ??= false;
 window.VELA.prefs.haptics ??= true;
 window.VELA.prefs.simpleAnim ??= false;
 window.VELA.prefs.apiKey ??= '';
-if (!window.VELA.unlocked.backs.includes('classic')) window.VELA.unlocked.backs.unshift('classic');
-if (!window.VELA.unlocked.faces.includes('classic')) window.VELA.unlocked.faces.unshift('classic');
+storage.set('vela_points', Math.max(Number(window.VELA.points) || 0, DEFAULT_LOCAL_POINTS));
+if (isTestAccessEnabled()) enableTestAccess({ persist: false, silent: true });
 
-window.VELA_UTIL = { storage, $, $$, el, fmtTime, dayKey };
+window.VELA_UTIL = {
+  storage, $, $$, el, fmtTime, dayKey,
+  DEFAULT_UNLOCKED, TEST_UNLOCKED, DEFAULT_LOCAL_POINTS,
+  normalizeUnlocked, normalizeVelaState, ensurePreviewPoints,
+  isLocalPreview, isTestAccessEnabled, enableTestAccess
+};

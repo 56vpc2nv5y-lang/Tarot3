@@ -398,17 +398,35 @@ body[data-theme="D"] .card-back-inner svg { stroke: #fff; fill: none; opacity: .
 /* ============================================================
    CARD BACK SKINS (override theme defaults when set)
    ============================================================ */
-body[data-cardback="cat"] .card-back {
-  background:
-    radial-gradient(circle at 20% 30%, rgba(255,255,255,0.4) 6px, transparent 7px),
-    radial-gradient(circle at 70% 60%, rgba(255,255,255,0.35) 5px, transparent 6px),
-    radial-gradient(circle at 40% 80%, rgba(255,255,255,0.3) 4px, transparent 5px),
-    radial-gradient(circle at 85% 20%, rgba(255,255,255,0.3) 3px, transparent 4px),
-    linear-gradient(135deg, #f5b8c8, #e89bb0) !important;
+/* Photo card backs: render the artist's actual back artwork on the cards.
+   Paths are relative to this CSS file (assets/css/), so step up to repo root. */
+body[data-cardback="cat"] .card-back,
+body[data-cardback="divine"] .card-back,
+body[data-cardback="botanical"] .card-back,
+.card-back[data-cardback="botanical"] {
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
 }
-body[data-cardback="cat"] .card-back-inner svg { stroke: rgba(255,255,255,0.7) !important; animation: none !important; }
-body[data-cardback="cat"] .card-back-inner::after {
-  content: '🐾'; position: absolute; font-size: 36px; opacity: .25;
+/* Hide the rotating SVG sigil so it doesn't overlay the artwork */
+body[data-cardback="cat"] .card-back-inner,
+.card-back[data-cardback="cat"] .card-back-inner,
+body[data-cardback="divine"] .card-back-inner,
+.card-back[data-cardback="divine"] .card-back-inner,
+body[data-cardback="botanical"] .card-back-inner,
+.card-back[data-cardback="botanical"] .card-back-inner { display: none !important; }
+
+body[data-cardback="cat"] .card-back,
+.card-back[data-cardback="cat"] {
+  background-image: url("../../cat/cat_card_back.png") !important;
+}
+body[data-cardback="divine"] .card-back,
+.card-back[data-cardback="divine"] {
+  background-image: url("../../chinese god and godness/chinese_divine_card_back.png") !important;
+}
+body[data-cardback="botanical"] .card-back,
+.card-back[data-cardback="botanical"] {
+  background-image: url("../../tree/botanical_codex_card_back.png") !important;
 }
 
 body[data-cardback="zodiac"] .card-back {
@@ -1193,18 +1211,24 @@ textarea {
 /* ============================================================
    CUSTOM DECK SKINS
    ============================================================ */
-body[data-cardback="cat"] .card-back {
+body[data-cardback="cat"] .card-back,
+.card-back[data-cardback="cat"] {
   background: url("../../cat/cat_card_back.png") center / cover no-repeat !important;
 }
-body[data-cardback="divine"] .card-back {
+body[data-cardback="divine"] .card-back,
+.card-back[data-cardback="divine"] {
   background: url("../../chinese god and godness/chinese_divine_card_back.png") center / cover no-repeat !important;
 }
-body[data-cardback="botanical"] .card-back {
+body[data-cardback="botanical"] .card-back,
+.card-back[data-cardback="botanical"] {
   background: url("../../tree/botanical_codex_card_back.png") center / cover no-repeat !important;
 }
 body[data-cardback="cat"] .card-back-inner,
+.card-back[data-cardback="cat"] .card-back-inner,
 body[data-cardback="divine"] .card-back-inner,
-body[data-cardback="botanical"] .card-back-inner { display: none !important; }
+.card-back[data-cardback="divine"] .card-back-inner,
+body[data-cardback="botanical"] .card-back-inner,
+.card-back[data-cardback="botanical"] .card-back-inner { display: none !important; }
 
 .card-front-img,
 .slot img,

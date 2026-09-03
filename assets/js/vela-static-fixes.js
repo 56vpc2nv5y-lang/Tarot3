@@ -5,6 +5,11 @@
   const TEST_CODE = 'VELA-TEST-10000';
   const BACK_PATTERN = /(back|cardback|牌背|猫.*背|divine.*back|botanical.*back)/i;
   const MAGIC_STYLE_ID = 'vela-static-fix-style';
+  const STATIC_CARD_BACKS = Object.freeze({
+    cat: 'cat/cat_card_back.png',
+    divine: 'chinese god and godness/chinese_divine_card_back.png',
+    botanical: 'tree/botanical_codex_card_back.png'
+  });
 
   const TAROT_SYSTEM_PROMPT = `你是 VELA，一位温柔、清醒、重视象征依据的塔罗解读者。塔罗在这里是一面帮助来访者观察处境与选择的镜子，不是确定预言，也不能代替医疗、法律、财务或安全方面的专业意见。
 
@@ -77,6 +82,43 @@
     });
     document.body.appendChild(dialog);
     return dialog;
+  }
+
+  function forcePreviewPoints() {
+    if (!window.VELA_UTIL?.isLocalPreview?.() || !window.VELA) return;
+    const min = window.VELA_UTIL.DEFAULT_LOCAL_POINTS || 10000;
+    if ((Number(window.VELA.points) || 0) < min) {
+      window.VELA.points = min;
+      window.VELA_UTIL.storage?.set?.('vela_points', min);
+    }
+    const display = document.getElementById('points-display');
+    if (display) display.textContent = Number(window.VELA.points || min).toLocaleString();
+  }
+  function forceCardBackSkin(root = document) {
+    const skin = window.VELA?.cardBack || document.body?.dataset?.cardback || 'classic';
+    if (document.body) document.body.dataset.cardback = skin;
+    const backs = [];
+    if (root.matches?.('.card-back')) backs.push(root);
+    root.querySelectorAll?.('.card-back').forEach(back => backs.push(back));
+    backs.forEach(back => {
+      back.dataset.cardback = skin;
+      const src = STATIC_CARD_BACKS[skin];
+      const inner = back.querySelector('.card-back-inner');
+      if (src) {
+        back.style.background = `url("${src}") center / cover no-repeat`;
+        back.style.backgroundSize = 'cover';
+        back.style.backgroundPosition = 'center';
+        back.style.backgroundRepeat = 'no-repeat';
+        if (inner) inner.style.display = 'none';
+      } else {
+        back.style.removeProperty('background');
+        back.style.removeProperty('background-image');
+        back.style.removeProperty('background-size');
+        back.style.removeProperty('background-position');
+        back.style.removeProperty('background-repeat');
+        if (inner) inner.style.removeProperty('display');
+      }
+    });
   }
 
   function openGestureGuide() {
@@ -189,7 +231,19 @@
   }
 
   function grantLocalPoints(amount) {
+    const n = Number(amount) || 0;
     let changed = false;
+    if (window.VELA && n > 0) {
+      window.VELA.points = (Number(window.VELA.points) || 0) + n;
+      window.VELA.pointsLog = Array.isArray(window.VELA.pointsLog) ? window.VELA.pointsLog : [];
+      window.VELA.pointsLog.unshift({ n, reason: `兑换码 ${TEST_CODE}`, ts: Date.now() });
+      window.VELA.pointsLog = window.VELA.pointsLog.slice(0, 50);
+      if (!Array.isArray(window.VELA.usedCodes)) window.VELA.usedCodes = [];
+      if (!window.VELA.usedCodes.includes(TEST_CODE)) window.VELA.usedCodes.push(TEST_CODE);
+      window.VELA_POINTS?.updatePointsDisplay?.();
+      window.VELA.save?.();
+      changed = true;
+    }
     for (let index = 0; index < localStorage.length; index += 1) {
       const key = localStorage.key(index);
       if (!key) continue;
@@ -234,14 +288,9 @@
       input = inputs.find(item => String(item.value || '').trim().toUpperCase() === TEST_CODE);
     }
     if (!input || String(input.value || '').trim().toUpperCase() !== TEST_CODE) return false;
-    if (localStorage.getItem('vela-test-code-used') === 'true') {
-      showToast('这个测试兑换码已经使用过了');
-      return true;
-    }
     const changed = grantLocalPoints(10000);
     localStorage.setItem('vela-test-code-used', 'true');
-    showToast(changed ? '测试兑换成功：+10000 积分' : '已记录测试积分；刷新页面后查看');
-    setTimeout(() => location.reload(), 900);
+    showToast(changed ? '测试兑换成功 +10000 积分' : '测试积分已写入，请刷新后查看');
     return true;
   }
 
@@ -266,6 +315,15 @@
   }
 
   async function startMagicGestures() {
+    if (window.VELA_GESTURES?.setGestureEnabled) {
+      const ok = await window.VELA_GESTURES.setGestureEnabled(true);
+      if (ok) {
+        window.VELA.prefs.gestureControl = true;
+        window.VELA.save?.();
+        window.VELA_GESTURES.showOnboarding?.(true);
+      }
+      return;
+    }
     if (gestureRunning) {
       showToast('魔法手势已经启用');
       return;
@@ -373,7 +431,7 @@
         return;
       }
       if (/皮肤|牌背|牌面|使用|装备/.test(text) || Object.keys(target.dataset || {}).some(key => /skin|face|back/i.test(key))) {
-        setTimeout(() => repairRevealedFaces(document), 80);
+        setTimeout(() => { repairRevealedFaces(document); forceCardBackSkin(document); }, 80);
       }
     }, true);
   }
@@ -385,6 +443,11 @@
     repairRevealedFaces();
     injectSkinStoryButton();
     injectRedeemHint();
+    forcePreviewPoints();
+    forceCardBackSkin();
+    setTimeout(forcePreviewPoints, 200);
+    setTimeout(forceCardBackSkin, 200);
+    setTimeout(forcePreviewPoints, 1000);
     const observer = new MutationObserver(records => {
       records.forEach(record => {
         if (record.type === 'attributes') repairRevealedFaces(record.target.parentElement || document);
@@ -393,6 +456,8 @@
           repairRevealedFaces(node);
           injectSkinStoryButton(node);
           injectRedeemHint(node);
+          forcePreviewPoints();
+          forceCardBackSkin(node);
         });
       });
     });

@@ -97,6 +97,7 @@
   }
 
   function updatePointsDisplay() {
+    window.VELA_UTIL?.ensurePreviewPoints?.();
     const el = document.getElementById('points-display');
     if (el) el.textContent = window.VELA.points.toLocaleString();
   }
